@@ -4,11 +4,13 @@ import ghrir.digikarte.dto.AuthResponse;
 import ghrir.digikarte.dto.LoginRequest;
 import ghrir.digikarte.dto.RegisterRequest;
 import ghrir.digikarte.entity.User;
+import ghrir.digikarte.exception.EmailAlreadyExistsException;
 import ghrir.digikarte.repository.UserRepository;
 import ghrir.digikarte.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +25,7 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Un compte existe déjà avec cet email");
+            throw new EmailAlreadyExistsException("Un compte existe déjà avec cet email");
         }
         User user = User.builder()
                 .nom(request.getNom())
@@ -55,5 +57,11 @@ public class AuthService {
                 .prenom(user.getPrenom())
                 .userId(user.getId())
                 .build();
+    }
+
+    public void deleteCurrentUser(Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        userRepository.delete(user);
     }
 }
