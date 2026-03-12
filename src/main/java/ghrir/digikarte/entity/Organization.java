@@ -27,6 +27,10 @@ public class Organization {
     @Column(length = 500)
     private String description;
 
+    /** Logo de l'organisation (JPEG), stocké en base pour affichage dans le menu public. */
+    @Column(name = "logo", columnDefinition = "LONGBLOB")
+    private byte[] logo;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;

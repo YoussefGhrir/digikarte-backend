@@ -11,5 +11,6 @@ public class MenuItemDto {
     private String description;
     private BigDecimal price;
     private String imageUrl;
+    private String section;
     private Integer sortOrder;
 }

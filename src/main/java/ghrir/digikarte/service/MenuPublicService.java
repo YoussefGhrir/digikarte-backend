@@ -4,6 +4,7 @@ import ghrir.digikarte.dto.MenuItemDto;
 import ghrir.digikarte.dto.MenuPublicDto;
 import ghrir.digikarte.entity.Menu;
 import ghrir.digikarte.repository.MenuRepository;
+import ghrir.digikarte.service.OrganizationPhotoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 public class MenuPublicService {
 
     private final MenuRepository menuRepository;
+    private final OrganizationPhotoService organizationPhotoService;
 
     @Transactional(readOnly = true)
     public MenuPublicDto getBySlug(String slug) {
@@ -23,6 +25,7 @@ public class MenuPublicService {
         dto.setTitle(menu.getTitle());
         dto.setDescription(menu.getDescription());
         dto.setOrganizationName(menu.getOrganization().getName());
+        dto.setOrganizationLogoBase64(organizationPhotoService.toBase64(menu.getOrganization().getLogo()));
         dto.setItems(menu.getItems().stream().map(item -> {
             MenuItemDto i = new MenuItemDto();
             i.setId(item.getId());
@@ -30,6 +33,7 @@ public class MenuPublicService {
             i.setDescription(item.getDescription());
             i.setPrice(item.getPrice());
             i.setImageUrl(item.getImageUrl());
+            i.setSection(item.getSection());
             i.setSortOrder(item.getSortOrder());
             return i;
         }).collect(Collectors.toList()));

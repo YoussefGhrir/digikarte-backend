@@ -69,7 +69,7 @@ public class MenuService {
     }
 
     @Transactional
-    public MenuDto addItem(Long menuId, Long userId, String name, String description, BigDecimal price, String imageUrl, Integer sortOrder) {
+    public MenuDto addItem(Long menuId, Long userId, String name, String description, BigDecimal price, String imageUrl, Integer sortOrder, String section) {
         Menu menu = menuRepository.findById(menuId).orElseThrow(() -> new RuntimeException("Menu non trouvé"));
         if (!menu.getOrganization().getOwner().getId().equals(userId)) {
             throw new RuntimeException("Non autorisé");
@@ -79,6 +79,7 @@ public class MenuService {
                 .description(description)
                 .price(price)
                 .imageUrl(imageUrl)
+                .section(section)
                 .sortOrder(sortOrder != null ? sortOrder : menu.getItems().size())
                 .menu(menu)
                 .build();
@@ -88,7 +89,7 @@ public class MenuService {
     }
 
     @Transactional
-    public MenuDto updateItem(Long menuId, Long itemId, Long userId, String name, String description, BigDecimal price, String imageUrl, Integer sortOrder) {
+    public MenuDto updateItem(Long menuId, Long itemId, Long userId, String name, String description, BigDecimal price, String imageUrl, Integer sortOrder, String section) {
         Menu menu = menuRepository.findById(menuId).orElseThrow(() -> new RuntimeException("Menu non trouvé"));
         if (!menu.getOrganization().getOwner().getId().equals(userId)) {
             throw new RuntimeException("Non autorisé");
@@ -99,6 +100,7 @@ public class MenuService {
         if (description != null) item.setDescription(description);
         if (price != null) item.setPrice(price);
         if (imageUrl != null) item.setImageUrl(imageUrl);
+        if (section != null) item.setSection(section);
         if (sortOrder != null) item.setSortOrder(sortOrder);
         menuRepository.save(menu);
         return toDto(menuRepository.findById(menuId).orElseThrow());
@@ -142,6 +144,7 @@ public class MenuService {
         dto.setDescription(item.getDescription());
         dto.setPrice(item.getPrice());
         dto.setImageUrl(item.getImageUrl());
+        dto.setSection(item.getSection());
         dto.setSortOrder(item.getSortOrder());
         return dto;
     }

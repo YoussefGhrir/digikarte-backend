@@ -2,6 +2,7 @@ package ghrir.digikarte.service;
 
 import ghrir.digikarte.dto.AuthResponse;
 import ghrir.digikarte.dto.LoginRequest;
+import ghrir.digikarte.dto.ProfileDto;
 import ghrir.digikarte.dto.RegisterRequest;
 import ghrir.digikarte.entity.User;
 import ghrir.digikarte.exception.EmailAlreadyExistsException;
@@ -14,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Base64;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -22,6 +25,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final ProfilePhotoService profilePhotoService;
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -63,5 +67,46 @@ public class AuthService {
         String email = authentication.getName();
         User user = userRepository.findByEmail(email).orElseThrow();
         userRepository.delete(user);
+    }
+
+    public ProfileDto getProfile(Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        String photoB64 = user.getProfilePhoto() != null && user.getProfilePhoto().length > 0
+                ? Base64.getEncoder().encodeToString(user.getProfilePhoto())
+                : null;
+        return ProfileDto.builder()
+                .email(user.getEmail())
+                .nom(user.getNom())
+                .prenom(user.getPrenom())
+                .telephone(user.getTelephone())
+                .profilePhotoBase64(photoB64)
+                .build();
+    }
+
+    public ProfileDto updateProfile(Authentication authentication, String prenom, String nom, String telephone) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        if (prenom != null && !prenom.isBlank()) user.setPrenom(prenom.trim());
+        if (nom != null && !nom.isBlank()) user.setNom(nom.trim());
+        if (telephone != null) user.setTelephone(telephone.trim());
+        user = userRepository.save(user);
+        String photoB64 = user.getProfilePhoto() != null && user.getProfilePhoto().length > 0
+                ? Base64.getEncoder().encodeToString(user.getProfilePhoto())
+                : null;
+        return ProfileDto.builder()
+                .email(user.getEmail())
+                .nom(user.getNom())
+                .prenom(user.getPrenom())
+                .telephone(user.getTelephone())
+                .profilePhotoBase64(photoB64)
+                .build();
+    }
+
+    public void updateProfilePhoto(Authentication authentication, byte[] processedPhoto) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        user.setProfilePhoto(processedPhoto);
+        userRepository.save(user);
     }
 }

@@ -88,7 +88,8 @@ public class MenuController {
         BigDecimal price = body.get("price") != null ? new BigDecimal(body.get("price").toString()) : null;
         String imageUrl = (String) body.get("imageUrl");
         Integer sortOrder = body.get("sortOrder") != null ? (Integer) body.get("sortOrder") : null;
-        return ResponseEntity.ok(menuService.addItem(id, userId, name, description, price, imageUrl, sortOrder));
+        String section = (String) body.get("section");
+        return ResponseEntity.ok(menuService.addItem(id, userId, name, description, price, imageUrl, sortOrder, section));
     }
 
     @PutMapping("/{id}/items/{itemId}")
@@ -104,7 +105,8 @@ public class MenuController {
         BigDecimal price = body.get("price") != null ? new BigDecimal(body.get("price").toString()) : null;
         String imageUrl = (String) body.get("imageUrl");
         Integer sortOrder = body.get("sortOrder") != null ? (Integer) body.get("sortOrder") : null;
-        return ResponseEntity.ok(menuService.updateItem(id, itemId, userId, name, description, price, imageUrl, sortOrder));
+        String section = (String) body.get("section");
+        return ResponseEntity.ok(menuService.updateItem(id, itemId, userId, name, description, price, imageUrl, sortOrder, section));
     }
 
     @DeleteMapping("/{id}/items/{itemId}")

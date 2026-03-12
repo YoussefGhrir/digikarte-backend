@@ -32,6 +32,9 @@ public class MenuItem {
     @Column(length = 500)
     private String imageUrl;
 
+    @Column(length = 255)
+    private String section;
+
     @Column(nullable = false)
     @Builder.Default
     private Integer sortOrder = 0;

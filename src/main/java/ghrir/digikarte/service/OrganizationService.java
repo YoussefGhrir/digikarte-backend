@@ -5,6 +5,7 @@ import ghrir.digikarte.entity.Organization;
 import ghrir.digikarte.entity.User;
 import ghrir.digikarte.repository.OrganizationRepository;
 import ghrir.digikarte.repository.UserRepository;
+import ghrir.digikarte.service.OrganizationPhotoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ public class OrganizationService {
 
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
+    private final OrganizationPhotoService organizationPhotoService;
 
     @Transactional(readOnly = true)
     public List<OrganizationDto> findByOwnerId(Long userId) {
@@ -58,6 +60,16 @@ public class OrganizationService {
         organizationRepository.delete(org);
     }
 
+    @Transactional
+    public void updateLogo(Long id, Long userId, byte[] processedLogo) {
+        Organization org = organizationRepository.findById(id).orElseThrow(() -> new RuntimeException("Organisation non trouvée"));
+        if (!org.getOwner().getId().equals(userId)) {
+            throw new RuntimeException("Non autorisé");
+        }
+        org.setLogo(processedLogo);
+        organizationRepository.save(org);
+    }
+
     @Transactional(readOnly = true)
     public OrganizationDto getById(Long id, Long userId) {
         Organization org = organizationRepository.findById(id).orElseThrow(() -> new RuntimeException("Organisation non trouvée"));
@@ -72,6 +84,7 @@ public class OrganizationService {
         dto.setId(org.getId());
         dto.setName(org.getName());
         dto.setDescription(org.getDescription());
+        dto.setOrganizationLogoBase64(organizationPhotoService.toBase64(org.getLogo()));
         return dto;
     }
 }
