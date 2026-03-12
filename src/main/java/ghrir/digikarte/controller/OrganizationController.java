@@ -1,0 +1,69 @@
+package ghrir.digikarte.controller;
+
+import ghrir.digikarte.dto.OrganizationDto;
+import ghrir.digikarte.service.OrganizationService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/organizations")
+@RequiredArgsConstructor
+public class OrganizationController {
+
+    private final OrganizationService organizationService;
+    private final ghrir.digikarte.repository.UserRepository userRepository;
+
+    private Long currentUserId(UserDetails user) {
+        if (user == null) return null;
+        return userRepository.findByEmail(user.getUsername()).map(u -> u.getId()).orElse(null);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<OrganizationDto>> list(@AuthenticationPrincipal UserDetails user) {
+        Long userId = currentUserId(user);
+        if (userId == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(organizationService.findByOwnerId(userId));
+    }
+
+    @PostMapping
+    public ResponseEntity<OrganizationDto> create(
+            @AuthenticationPrincipal UserDetails user,
+            @RequestBody Map<String, String> body) {
+        Long userId = currentUserId(user);
+        if (userId == null) return ResponseEntity.status(401).build();
+        String name = body.get("name");
+        String description = body.get("description");
+        return ResponseEntity.ok(organizationService.create(userId, name, description));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<OrganizationDto> get(@PathVariable Long id, @AuthenticationPrincipal UserDetails user) {
+        Long userId = currentUserId(user);
+        if (userId == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(organizationService.getById(id, userId));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<OrganizationDto> update(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails user,
+            @RequestBody Map<String, String> body) {
+        Long userId = currentUserId(user);
+        if (userId == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(organizationService.update(id, userId, body.get("name"), body.get("description")));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal UserDetails user) {
+        Long userId = currentUserId(user);
+        if (userId == null) return ResponseEntity.status(401).build();
+        organizationService.delete(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+}
