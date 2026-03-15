@@ -39,6 +39,10 @@ public class MenuItem {
     @Builder.Default
     private Integer sortOrder = 0;
 
+    /** Si non null : sous-produit rattaché au plat parent (même section). */
+    @Column(name = "parent_item_id")
+    private Long parentItemId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "menu_id", nullable = false)
     private Menu menu;

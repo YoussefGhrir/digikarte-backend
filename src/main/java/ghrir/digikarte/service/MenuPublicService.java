@@ -3,6 +3,7 @@ package ghrir.digikarte.service;
 import ghrir.digikarte.dto.MenuItemDto;
 import ghrir.digikarte.dto.MenuPublicDto;
 import ghrir.digikarte.entity.Menu;
+import ghrir.digikarte.entity.Organization;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.service.OrganizationPhotoService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,13 @@ public class MenuPublicService {
         dto.setTitle(menu.getTitle());
         dto.setDescription(menu.getDescription());
         dto.setOrganizationName(menu.getOrganization().getName());
+        dto.setOrganizationSlogan(menu.getOrganization().getSlogan());
         dto.setOrganizationLogoBase64(organizationPhotoService.toBase64(menu.getOrganization().getLogo()));
+        dto.setOrganizationAddress(formatOrganizationAddress(menu.getOrganization()));
+        dto.setOrganizationPhone(menu.getOrganization().getPhone());
+        dto.setOrganizationEmail(menu.getOrganization().getEmail());
+        dto.setDisplayTemplate(menu.getDisplayTemplate());
+        dto.setPriceCurrency(menu.getPriceCurrency() != null ? menu.getPriceCurrency() : "EUR");
         dto.setItems(menu.getItems().stream().map(item -> {
             MenuItemDto i = new MenuItemDto();
             i.setId(item.getId());
@@ -35,8 +42,36 @@ public class MenuPublicService {
             i.setImageUrl(item.getImageUrl());
             i.setSection(item.getSection());
             i.setSortOrder(item.getSortOrder());
+            i.setParentItemId(item.getParentItemId());
             return i;
         }).collect(Collectors.toList()));
         return dto;
+    }
+
+    /** Adresse sur une ou plusieurs lignes (rue, CP ville, pays) pour affichage footer. */
+    private String formatOrganizationAddress(Organization org) {
+        if (org.getAddressLine1() == null && org.getAddressPostalCode() == null
+                && org.getAddressCity() == null && org.getCountry() == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (org.getAddressLine1() != null && !org.getAddressLine1().isBlank()) {
+            sb.append(org.getAddressLine1().trim());
+        }
+        boolean hasPostalCity = (org.getAddressPostalCode() != null && !org.getAddressPostalCode().isBlank())
+                || (org.getAddressCity() != null && !org.getAddressCity().isBlank());
+        if (hasPostalCity) {
+            if (sb.length() > 0) sb.append(", ");
+            if (org.getAddressPostalCode() != null) sb.append(org.getAddressPostalCode().trim());
+            if (org.getAddressCity() != null && !org.getAddressCity().isBlank()) {
+                if (org.getAddressPostalCode() != null && !org.getAddressPostalCode().isBlank()) sb.append(" ");
+                sb.append(org.getAddressCity().trim());
+            }
+        }
+        if (org.getCountry() != null && !org.getCountry().isBlank()) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(org.getCountry().trim());
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 }

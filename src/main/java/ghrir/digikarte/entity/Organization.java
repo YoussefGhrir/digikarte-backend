@@ -27,6 +27,32 @@ public class Organization {
     @Column(length = 500)
     private String description;
 
+    /** Slogan du restaurant / café (affiché sur le menu public). */
+    @Column(length = 255)
+    private String slogan;
+
+    /** Adresse (rue et numéro) – pour café/resto, menu public et conformité Allemagne. */
+    @Column(name = "address_line1", length = 255)
+    private String addressLine1;
+
+    @Column(name = "address_postal_code", length = 20)
+    private String addressPostalCode;
+
+    @Column(name = "address_city", length = 100)
+    private String addressCity;
+
+    /** Pays (ex. Deutschland / Allemagne). */
+    @Column(length = 100)
+    private String country;
+
+    /** Téléphone – affiché dans le menu public et footer. */
+    @Column(length = 50)
+    private String phone;
+
+    /** Email de contact (optionnel). */
+    @Column(length = 255)
+    private String email;
+
     /** Logo de l'organisation (JPEG), stocké en base pour affichage dans le menu public. */
     @Column(name = "logo", columnDefinition = "LONGBLOB")
     private byte[] logo;

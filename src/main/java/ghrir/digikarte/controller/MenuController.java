@@ -48,7 +48,8 @@ public class MenuController {
         Long orgId = Long.valueOf(body.get("organizationId").toString());
         String title = (String) body.get("title");
         String description = (String) body.get("description");
-        return ResponseEntity.ok(menuService.create(orgId, userId, title, description));
+        String priceCurrency = body.get("priceCurrency") != null ? body.get("priceCurrency").toString().trim().toUpperCase() : "EUR";
+        return ResponseEntity.ok(menuService.create(orgId, userId, title, description, priceCurrency));
     }
 
     @GetMapping("/{id}")
@@ -65,7 +66,8 @@ public class MenuController {
             @RequestBody Map<String, String> body) {
         Long userId = currentUserId(user);
         if (userId == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(menuService.update(id, userId, body.get("title"), body.get("description")));
+        String priceCurrency = body.get("priceCurrency");
+        return ResponseEntity.ok(menuService.update(id, userId, body.get("title"), body.get("description"), body.get("displayTemplate"), priceCurrency));
     }
 
     @DeleteMapping("/{id}")
@@ -89,7 +91,8 @@ public class MenuController {
         String imageUrl = (String) body.get("imageUrl");
         Integer sortOrder = body.get("sortOrder") != null ? (Integer) body.get("sortOrder") : null;
         String section = (String) body.get("section");
-        return ResponseEntity.ok(menuService.addItem(id, userId, name, description, price, imageUrl, sortOrder, section));
+        Long parentItemId = body.get("parentItemId") != null ? Long.valueOf(body.get("parentItemId").toString()) : null;
+        return ResponseEntity.ok(menuService.addItem(id, userId, name, description, price, imageUrl, sortOrder, section, parentItemId));
     }
 
     @PutMapping("/{id}/items/{itemId}")

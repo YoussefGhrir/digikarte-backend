@@ -65,7 +65,7 @@ public class QrCodeService {
         };
     }
 
-    /** URL publique du menu (pour que le front génère aussi des QR avec cette URL). */
+    /** URL publique du menu (slug immutable côté entity → lien fixe à vie, adapté à l’impression QR). */
     public String getMenuPublicUrl(String slug) {
         return frontendUrl + "/menu/" + slug;
     }

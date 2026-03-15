@@ -13,4 +13,5 @@ public class MenuItemDto {
     private String imageUrl;
     private String section;
     private Integer sortOrder;
+    private Long parentItemId;
 }

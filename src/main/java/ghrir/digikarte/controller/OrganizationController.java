@@ -42,9 +42,16 @@ public class OrganizationController {
             @RequestBody Map<String, String> body) {
         Long userId = currentUserId(user);
         if (userId == null) return ResponseEntity.status(401).build();
-        String name = body.get("name");
-        String description = body.get("description");
-        return ResponseEntity.ok(organizationService.create(userId, name, description));
+        return ResponseEntity.ok(organizationService.create(
+                userId,
+                body.get("name"),
+                body.get("slogan"),
+                body.get("addressLine1"),
+                body.get("addressPostalCode"),
+                body.get("addressCity"),
+                body.get("country"),
+                body.get("phone"),
+                body.get("email")));
     }
 
     @GetMapping("/{id}")
@@ -61,7 +68,16 @@ public class OrganizationController {
             @RequestBody Map<String, String> body) {
         Long userId = currentUserId(user);
         if (userId == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(organizationService.update(id, userId, body.get("name"), body.get("description")));
+        return ResponseEntity.ok(organizationService.update(
+                id, userId,
+                body.get("name"),
+                body.get("slogan"),
+                body.get("addressLine1"),
+                body.get("addressPostalCode"),
+                body.get("addressCity"),
+                body.get("country"),
+                body.get("phone"),
+                body.get("email")));
     }
 
     @PostMapping("/{id}/photo")

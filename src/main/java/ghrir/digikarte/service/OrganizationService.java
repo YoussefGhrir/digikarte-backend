@@ -29,11 +29,20 @@ public class OrganizationService {
     }
 
     @Transactional
-    public OrganizationDto create(Long userId, String name, String description) {
+    public OrganizationDto create(Long userId, String name, String slogan,
+                                  String addressLine1, String addressPostalCode, String addressCity,
+                                  String country, String phone, String email) {
         User owner = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
         Organization org = Organization.builder()
                 .name(name)
-                .description(description)
+                .description(null)
+                .slogan(slogan)
+                .addressLine1(addressLine1)
+                .addressPostalCode(addressPostalCode)
+                .addressCity(addressCity)
+                .country(country)
+                .phone(phone)
+                .email(email)
                 .owner(owner)
                 .build();
         org = organizationRepository.save(org);
@@ -41,13 +50,21 @@ public class OrganizationService {
     }
 
     @Transactional
-    public OrganizationDto update(Long id, Long userId, String name, String description) {
+    public OrganizationDto update(Long id, Long userId, String name, String slogan,
+                                  String addressLine1, String addressPostalCode, String addressCity,
+                                  String country, String phone, String email) {
         Organization org = organizationRepository.findById(id).orElseThrow(() -> new RuntimeException("Organisation non trouvée"));
         if (!org.getOwner().getId().equals(userId)) {
             throw new RuntimeException("Non autorisé");
         }
         if (name != null) org.setName(name);
-        if (description != null) org.setDescription(description);
+        if (slogan != null) org.setSlogan(slogan);
+        if (addressLine1 != null) org.setAddressLine1(addressLine1);
+        if (addressPostalCode != null) org.setAddressPostalCode(addressPostalCode);
+        if (addressCity != null) org.setAddressCity(addressCity);
+        if (country != null) org.setCountry(country);
+        if (phone != null) org.setPhone(phone);
+        if (email != null) org.setEmail(email);
         return toDto(organizationRepository.save(org));
     }
 
@@ -84,6 +101,13 @@ public class OrganizationService {
         dto.setId(org.getId());
         dto.setName(org.getName());
         dto.setDescription(org.getDescription());
+        dto.setSlogan(org.getSlogan());
+        dto.setAddressLine1(org.getAddressLine1());
+        dto.setAddressPostalCode(org.getAddressPostalCode());
+        dto.setAddressCity(org.getAddressCity());
+        dto.setCountry(org.getCountry());
+        dto.setPhone(org.getPhone());
+        dto.setEmail(org.getEmail());
         dto.setOrganizationLogoBase64(organizationPhotoService.toBase64(org.getLogo()));
         return dto;
     }
