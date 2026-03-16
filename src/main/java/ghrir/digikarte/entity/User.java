@@ -51,4 +51,18 @@ public class User {
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Organization> organizations = new ArrayList<>();
+
+    /**
+     * Identifiant du client Stripe associé à cet utilisateur (mode test ou live).
+     * Peut être null si l'utilisateur n'a pas encore démarré de flux Stripe.
+     */
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+
+    /**
+     * Identifiant de l'abonnement Stripe courant de l'utilisateur.
+     * Utilisé pour récupérer l'état d'abonnement et les périodes de facturation.
+     */
+    @Column(name = "stripe_subscription_id")
+    private String stripeSubscriptionId;
 }

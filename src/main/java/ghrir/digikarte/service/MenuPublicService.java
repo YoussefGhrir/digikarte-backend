@@ -1,5 +1,7 @@
 package ghrir.digikarte.service;
 
+import com.stripe.exception.StripeException;
+import com.stripe.model.Subscription;
 import ghrir.digikarte.dto.MenuItemDto;
 import ghrir.digikarte.dto.MenuPublicDto;
 import ghrir.digikarte.entity.Menu;
@@ -18,10 +20,29 @@ public class MenuPublicService {
 
     private final MenuRepository menuRepository;
     private final OrganizationPhotoService organizationPhotoService;
+    private final BillingService billingService;
 
     @Transactional(readOnly = true)
     public MenuPublicDto getBySlug(String slug) {
         Menu menu = menuRepository.findBySlug(slug).orElseThrow(() -> new RuntimeException("Menu non trouvé"));
+        Organization org = menu.getOrganization();
+
+        // Vérifie que le propriétaire possède un abonnement actif ou en essai.
+        if (org.getOwner() == null || org.getOwner().getStripeSubscriptionId() == null
+                || org.getOwner().getStripeSubscriptionId().isBlank()) {
+            throw new RuntimeException("Abonnement requis pour afficher ce menu.");
+        }
+        String subId = org.getOwner().getStripeSubscriptionId();
+        try {
+            Subscription sub = billingService.retrieveSubscription(subId);
+            String status = sub.getStatus() != null ? sub.getStatus().toLowerCase() : "";
+            if (!"active".equals(status) && !"trialing".equals(status)) {
+                throw new RuntimeException("Abonnement inactif – menu non disponible.");
+            }
+        } catch (StripeException e) {
+            throw new RuntimeException("Erreur de vérification d'abonnement Stripe.", e);
+        }
+
         MenuPublicDto dto = new MenuPublicDto();
         dto.setTitle(menu.getTitle());
         dto.setDescription(menu.getDescription());
