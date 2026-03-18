@@ -7,6 +7,18 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MenuRepository extends JpaRepository<Menu, Long> {
+
+    interface MenuSummaryView {
+        Long getId();
+        String getTitle();
+        String getSlug();
+        String getDisplayTemplate();
+        String getPriceCurrency();
+    }
+
     List<Menu> findByOrganizationId(Long organizationId);
+
+    List<MenuSummaryView> findByOrganizationIdOrderByIdAsc(Long organizationId);
+
     Optional<Menu> findBySlug(String slug);
 }

@@ -39,6 +39,18 @@ public class MenuController {
         return ResponseEntity.ok(menuService.findByOrganizationId(organizationId, userId));
     }
 
+    /**
+     * Liste allégée pour le dashboard (sans items).
+     */
+    @GetMapping("/summary")
+    public ResponseEntity<List<MenuDto>> listSummary(
+            @RequestParam Long organizationId,
+            @AuthenticationPrincipal UserDetails user) {
+        Long userId = currentUserId(user);
+        if (userId == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(menuService.findSummariesByOrganizationId(organizationId, userId));
+    }
+
     @PostMapping
     public ResponseEntity<MenuDto> create(
             @AuthenticationPrincipal UserDetails user,

@@ -33,6 +33,31 @@ public class MenuService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Version allégée pour la liste des menus (dashboard) :
+     * renvoie seulement les infos de base + nombre d'items, sans charger tous les éléments.
+     */
+    @Transactional(readOnly = true)
+    public List<MenuDto> findSummariesByOrganizationId(Long organizationId, Long userId) {
+        Organization org = organizationRepository.findById(organizationId).orElseThrow(() -> new RuntimeException("Organisation non trouvée"));
+        if (!org.getOwner().getId().equals(userId)) {
+            throw new RuntimeException("Non autorisé");
+        }
+        return menuRepository.findByOrganizationIdOrderByIdAsc(organizationId).stream()
+                .map(view -> {
+                    MenuDto dto = new MenuDto();
+                    dto.setId(view.getId());
+                    dto.setTitle(view.getTitle());
+                    dto.setSlug(view.getSlug());
+                    dto.setOrganizationId(organizationId);
+                    dto.setDisplayTemplate(view.getDisplayTemplate());
+                    dto.setPriceCurrency(view.getPriceCurrency() != null ? view.getPriceCurrency() : "EUR");
+                    dto.setItems(List.of()); // items non chargés ici
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public MenuDto create(Long organizationId, Long userId, String title, String description, String priceCurrency) {
         Organization org = organizationRepository.findById(organizationId).orElseThrow(() -> new RuntimeException("Organisation non trouvée"));
