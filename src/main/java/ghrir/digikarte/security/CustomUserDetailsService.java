@@ -18,8 +18,8 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Object[] creds = userRepository.findCredentialsByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Utilisateur non trouvé: " + email));
-        String foundEmail = (String) creds[1];
-        String foundPassword = (String) creds[2];
+        String foundEmail = (String) creds[0];
+        String foundPassword = (String) creds[1];
         return new org.springframework.security.core.userdetails.User(
                 foundEmail,
                 foundPassword,

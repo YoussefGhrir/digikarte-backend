@@ -11,9 +11,10 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
 
     /**
-     * Variante optimisée pour l'auth qui ne charge pas le LOB profilePhoto.
+     * Variante optimisée pour l'auth qui ne charge que l'email et le mot de passe
+     * (évite de charger le LOB profilePhoto).
      */
-    @Query("select u.id, u.email, u.password from User u where u.email = :email")
+    @Query("select u.email, u.password from User u where u.email = :email")
     Optional<Object[]> findCredentialsByEmail(@Param("email") String email);
 
     Optional<User> findByEmail(String email);
