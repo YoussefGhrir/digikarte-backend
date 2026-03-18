@@ -54,7 +54,8 @@ public class Organization {
     private String email;
 
     /** Logo de l'organisation (JPEG), stocké en base pour affichage dans le menu public. */
-    @Column(name = "logo", columnDefinition = "LONGBLOB")
+    @Lob
+    @Column(name = "logo")
     private byte[] logo;
 
     @ManyToOne(fetch = FetchType.LAZY)
