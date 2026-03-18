@@ -9,10 +9,11 @@ import ghrir.digikarte.entity.Organization;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.service.OrganizationPhotoService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,26 +25,9 @@ public class MenuPublicService {
     private final BillingService billingService;
 
     @Transactional(readOnly = true)
-    @Cacheable(cacheNames = "publicMenus", key = "#slug")
     public MenuPublicDto getBySlug(String slug) {
         Menu menu = menuRepository.findBySlug(slug).orElseThrow(() -> new RuntimeException("Menu non trouvé"));
         Organization org = menu.getOrganization();
-
-        // Vérifie que le propriétaire possède un abonnement actif ou en essai.
-        if (org.getOwner() == null || org.getOwner().getStripeSubscriptionId() == null
-                || org.getOwner().getStripeSubscriptionId().isBlank()) {
-            throw new RuntimeException("Abonnement requis pour afficher ce menu.");
-        }
-        String subId = org.getOwner().getStripeSubscriptionId();
-        try {
-            Subscription sub = billingService.retrieveSubscription(subId);
-            String status = sub.getStatus() != null ? sub.getStatus().toLowerCase() : "";
-            if (!"active".equals(status) && !"trialing".equals(status)) {
-                throw new RuntimeException("Abonnement inactif – menu non disponible.");
-            }
-        } catch (StripeException e) {
-            throw new RuntimeException("Erreur de vérification d'abonnement Stripe.", e);
-        }
 
         MenuPublicDto dto = new MenuPublicDto();
         dto.setTitle(menu.getTitle());
@@ -56,6 +40,38 @@ public class MenuPublicService {
         dto.setOrganizationEmail(menu.getOrganization().getEmail());
         dto.setDisplayTemplate(menu.getDisplayTemplate());
         dto.setPriceCurrency(menu.getPriceCurrency() != null ? menu.getPriceCurrency() : "EUR");
+
+        // Vérifie que le propriétaire possède un abonnement actif ou en essai.
+        // Si pas OK => mode indisponible (on ne jette pas d'exception, pour que la page affiche un message + pub).
+        boolean subscriptionOk = false;
+        String reason = null;
+        if (org.getOwner() == null || org.getOwner().getStripeSubscriptionId() == null || org.getOwner().getStripeSubscriptionId().isBlank()) {
+            subscriptionOk = false;
+            reason = "NO_SUBSCRIPTION";
+        } else {
+            String subId = org.getOwner().getStripeSubscriptionId();
+            try {
+                Subscription sub = billingService.retrieveSubscription(subId);
+                String status = sub.getStatus() != null ? sub.getStatus().toLowerCase() : "";
+                if ("active".equals(status) || "trialing".equals(status)) {
+                    subscriptionOk = true;
+                } else {
+                    subscriptionOk = false;
+                    reason = "SUBSCRIPTION_INACTIVE";
+                }
+            } catch (StripeException e) {
+                subscriptionOk = false;
+                reason = "ERROR";
+            }
+        }
+
+        if (!subscriptionOk) {
+            dto.setAvailable(false);
+            dto.setUnavailableReason(reason);
+            dto.setItems(List.of());
+            return dto;
+        }
+
         dto.setItems(menu.getItems().stream().map(item -> {
             MenuItemDto i = new MenuItemDto();
             i.setId(item.getId());

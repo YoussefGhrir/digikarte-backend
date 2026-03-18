@@ -336,14 +336,37 @@ public class BillingController {
             case "checkout.session.completed" -> {
                 Session session = (Session) event.getDataObjectDeserializer()
                         .getObject().orElseThrow();
-                // TODO: lier session.getCustomer() et session.getSubscription()
-                // à l'utilisateur (clientReferenceId = userId) et enregistrer
-                // stripeCustomerId + stripeSubscriptionId dans ta base.
+                // Reliage session <-> utilisateur via client_reference_id
+                // (dans BillingService on met setClientReferenceId(String.valueOf(userId))).
+                String clientRef = session.getClientReferenceId();
+                if (clientRef != null && !clientRef.isBlank()) {
+                    try {
+                        Long userId = Long.valueOf(clientRef);
+                        User user = userRepository.findById(userId)
+                                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé: " + userId));
+
+                        // customer + subscription sont en général présentes sur une session checkout complétée
+                        String customerId = session.getCustomer() != null ? session.getCustomer().toString() : null;
+                        String subscriptionId = session.getSubscription() != null ? session.getSubscription().toString() : null;
+
+                        if (customerId != null && !customerId.isBlank()) {
+                            user.setStripeCustomerId(customerId);
+                        }
+                        if (subscriptionId != null && !subscriptionId.isBlank()) {
+                            user.setStripeSubscriptionId(subscriptionId);
+                        }
+
+                        userRepository.save(user);
+                    } catch (Exception ignored) {
+                        // Le webhook doit répondre "ok" même si l'enregistrement en base échoue.
+                        // On évite de casser tout le flux Stripe.
+                    }
+                }
             }
             case "customer.subscription.updated", "customer.subscription.created" -> {
                 Subscription sub = (Subscription) event.getDataObjectDeserializer()
                         .getObject().orElseThrow();
-                // TODO: mettre à jour l'état de l'abonnement si tu gardes aussi un modèle local.
+                // Optionnel: on peut enrichir la base ici si tu stockes plus de champs.
             }
             case "invoice.payment_succeeded", "invoice.payment_failed" -> {
                 // TODO: éventuellement créer / mettre à jour des factures en base.

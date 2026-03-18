@@ -8,6 +8,7 @@ import ghrir.digikarte.entity.User;
 import ghrir.digikarte.exception.EmailAlreadyExistsException;
 import ghrir.digikarte.repository.UserRepository;
 import ghrir.digikarte.security.JwtService;
+import ghrir.digikarte.service.AdminBootstrapService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -52,7 +53,13 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        String lookup = request.getEmail();
+        if (lookup != null && !lookup.contains("@")) {
+            if (lookup.equalsIgnoreCase(AdminBootstrapService.DEFAULT_ADMIN_USERNAME)) {
+                lookup = AdminBootstrapService.DEFAULT_ADMIN_EMAIL;
+            }
+        }
+        User user = userRepository.findByEmail(lookup).orElseThrow();
         String token = jwtService.generateToken(user.getEmail(), user.getId());
         return AuthResponse.builder()
                 .token(token)
@@ -81,6 +88,7 @@ public class AuthService {
                 .prenom(user.getPrenom())
                 .telephone(user.getTelephone())
                 .profilePhotoBase64(photoB64)
+                .subscriptionBypass(user.isSubscriptionBypass())
                 .build();
     }
 
@@ -100,6 +108,7 @@ public class AuthService {
                 .prenom(user.getPrenom())
                 .telephone(user.getTelephone())
                 .profilePhotoBase64(photoB64)
+                .subscriptionBypass(user.isSubscriptionBypass())
                 .build();
     }
 

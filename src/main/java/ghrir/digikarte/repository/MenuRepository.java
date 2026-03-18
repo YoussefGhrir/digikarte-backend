@@ -18,6 +18,8 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
 
     List<Menu> findByOrganizationId(Long organizationId);
 
+    long countByOrganizationId(Long organizationId);
+
     List<MenuSummaryView> findByOrganizationIdOrderByIdAsc(Long organizationId);
 
     Optional<Menu> findBySlug(String slug);

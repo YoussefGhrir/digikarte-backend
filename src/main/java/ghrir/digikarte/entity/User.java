@@ -65,4 +65,16 @@ public class User {
      */
     @Column(name = "stripe_subscription_id")
     private String stripeSubscriptionId;
+
+    /**
+     * Si true, l'utilisateur peut accéder au dashboard sans abonnement Stripe.
+     * Utilisé pour les comptes créés manuellement par l'admin (accès direct).
+     */
+    @Builder.Default
+    @Column(
+            name = "subscription_bypass",
+            nullable = false,
+            columnDefinition = "boolean not null default false"
+    )
+    private boolean subscriptionBypass = false;
 }

@@ -121,10 +121,14 @@ public class BillingService {
     }
 
     public List<Invoice> listInvoicesForCustomer(String customerId) throws StripeException {
+        return listInvoicesForCustomer(customerId, 10L);
+    }
+
+    public List<Invoice> listInvoicesForCustomer(String customerId, long limit) throws StripeException {
         InvoiceListParams params = InvoiceListParams.builder()
-            .setCustomer(customerId)
-            .setLimit(10L)
-            .build();
+                .setCustomer(customerId)
+                .setLimit(limit)
+                .build();
         return Invoice.list(params).getData();
     }
 

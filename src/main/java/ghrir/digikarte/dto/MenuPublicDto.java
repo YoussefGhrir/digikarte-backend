@@ -23,4 +23,15 @@ public class MenuPublicDto {
     /** Unité des prix (devise) : EUR, USD, TND, GBP, CHF, etc. */
     private String priceCurrency;
     private List<MenuItemDto> items = new ArrayList<>();
+
+    /**
+     * Si false => le menu doit être affiché en mode indisponible (abonnement inactif).
+     */
+    private boolean available = true;
+
+    /**
+     * Raison côté backend (pour afficher un message multilingue côté front).
+     * Valeurs attendues : NO_SUBSCRIPTION, SUBSCRIPTION_INACTIVE, ERROR
+     */
+    private String unavailableReason;
 }
