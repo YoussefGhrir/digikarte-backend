@@ -31,5 +31,11 @@ public class AdminUserDto {
      * Si true => accès direct au dashboard sans abonnement (paywall désactivé).
      */
     private boolean subscriptionBypass;
+
+    /**
+     * Base64 JPEG, ou null si aucun fichier n'est enregistré.
+     * (Utilisé uniquement côté admin pour afficher un avatar.)
+     */
+    private String profilePhotoBase64;
 }
 

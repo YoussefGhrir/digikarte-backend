@@ -77,6 +77,7 @@ public class AdminController {
 
     private String primaryCountryForUser(User user) {
         List<Organization> orgs = organizationRepository.findByOwnerId(user.getId());
+        if (orgs == null || orgs.isEmpty()) return null;
         return orgs.stream()
                 .map(Organization::getCountry)
                 .filter(Objects::nonNull)
@@ -87,6 +88,7 @@ public class AdminController {
 
     private long menusCountForUser(User user) {
         List<Organization> orgs = organizationRepository.findByOwnerId(user.getId());
+        if (orgs == null || orgs.isEmpty()) return 0L;
         long total = 0;
         for (Organization org : orgs) {
             total += menuRepository.countByOrganizationId(org.getId());
@@ -95,7 +97,18 @@ public class AdminController {
     }
 
     private int organizationsCountForUser(User user) {
-        return organizationRepository.findByOwnerId(user.getId()).size();
+        List<Organization> orgs = organizationRepository.findByOwnerId(user.getId());
+        return orgs == null ? 0 : orgs.size();
+    }
+
+    private String profilePhotoBase64(User user) {
+        try {
+            byte[] photo = user.getProfilePhoto();
+            if (photo == null || photo.length == 0) return null;
+            return Base64.getEncoder().encodeToString(photo);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @GetMapping("/metrics")
@@ -231,10 +244,26 @@ public class AdminController {
 
         List<AdminUserDto> out = new ArrayList<>();
         for (User u : users) {
-            SubscriptionInfo sub = getSubscriptionInfo(u);
-            String country = primaryCountryForUser(u);
-            int orgCount = organizationsCountForUser(u);
-            long menusCount = menusCountForUser(u);
+            SubscriptionInfo sub;
+            try {
+                sub = getSubscriptionInfo(u);
+            } catch (Exception ignored) {
+                sub = new SubscriptionInfo("ERROR", null);
+            }
+
+            String country = null;
+            int orgCount = 0;
+            long menusCount = 0L;
+            try {
+                country = primaryCountryForUser(u);
+                orgCount = organizationsCountForUser(u);
+                menusCount = menusCountForUser(u);
+            } catch (Exception ignored) {
+                // Best-effort: on affiche au moins l'utilisateur même si certaines stats échouent.
+            }
+
+            String photo = profilePhotoBase64(u);
+
             out.add(new AdminUserDto(
                     u.getId(),
                     u.getNom(),
@@ -246,7 +275,8 @@ public class AdminController {
                     menusCount,
                     sub.status(),
                     sub.plan(),
-                    u.isSubscriptionBypass()
+                    u.isSubscriptionBypass(),
+                    photo
             ));
         }
         return out;
@@ -302,7 +332,8 @@ public class AdminController {
                 0L,
                 "NO_SUBSCRIPTION",
                 null,
-                created.isSubscriptionBypass()
+                created.isSubscriptionBypass(),
+                profilePhotoBase64(created)
         );
     }
 
@@ -336,7 +367,8 @@ public class AdminController {
                 menusCountForUser(user),
                 sub.status(),
                 sub.plan(),
-                user.isSubscriptionBypass()
+                user.isSubscriptionBypass(),
+                profilePhotoBase64(user)
         );
     }
 
