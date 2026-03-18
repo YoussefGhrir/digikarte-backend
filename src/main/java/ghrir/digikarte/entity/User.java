@@ -45,6 +45,7 @@ public class User {
     private String password;
 
     @Lob
+    @Basic(fetch = LAZY)
     @Column(name = "profile_photo")
     private byte[] profilePhoto;
 
