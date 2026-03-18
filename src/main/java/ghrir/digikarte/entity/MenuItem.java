@@ -9,7 +9,13 @@ import org.hibernate.annotations.OnDeleteAction;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "menu_items")
+@Table(
+        name = "menu_items",
+        indexes = {
+                @Index(name = "idx_menu_items_menu_id", columnList = "menu_id"),
+                @Index(name = "idx_menu_items_parent_item_id", columnList = "parent_item_id")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor

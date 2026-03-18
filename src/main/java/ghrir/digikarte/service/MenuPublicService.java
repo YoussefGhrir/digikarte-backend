@@ -9,6 +9,7 @@ import ghrir.digikarte.entity.Organization;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.service.OrganizationPhotoService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ public class MenuPublicService {
     private final BillingService billingService;
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "publicMenus", key = "#slug")
     public MenuPublicDto getBySlug(String slug) {
         Menu menu = menuRepository.findBySlug(slug).orElseThrow(() -> new RuntimeException("Menu non trouvé"));
         Organization org = menu.getOrganization();
