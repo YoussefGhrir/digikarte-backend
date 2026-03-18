@@ -17,6 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
@@ -224,62 +225,67 @@ public class AdminController {
     }
 
     @GetMapping("/users")
+    @Transactional(readOnly = true)
     public List<AdminUserDto> listUsers(
             @RequestParam(name = "q", required = false) String q,
             Authentication authentication
     ) {
         requireAdmin(authentication);
-
-        List<User> users = userRepository.findAll();
-        String query = q != null ? q.trim().toLowerCase() : null;
-        if (query != null && !query.isBlank()) {
-            users = users.stream().filter(u ->
-                            (u.getEmail() != null && u.getEmail().toLowerCase().contains(query)) ||
-                            (u.getNom() != null && u.getNom().toLowerCase().contains(query)) ||
-                            (u.getPrenom() != null && u.getPrenom().toLowerCase().contains(query)) ||
-                            (u.getTelephone() != null && u.getTelephone().toLowerCase().contains(query))
-                    )
-                    .toList();
-        }
-
-        List<AdminUserDto> out = new ArrayList<>();
-        for (User u : users) {
-            SubscriptionInfo sub;
-            try {
-                sub = getSubscriptionInfo(u);
-            } catch (Exception ignored) {
-                sub = new SubscriptionInfo("ERROR", null);
+        try {
+            List<User> users = userRepository.findAll();
+            String query = q != null ? q.trim().toLowerCase() : null;
+            if (query != null && !query.isBlank()) {
+                users = users.stream().filter(u ->
+                                (u.getEmail() != null && u.getEmail().toLowerCase().contains(query)) ||
+                                (u.getNom() != null && u.getNom().toLowerCase().contains(query)) ||
+                                (u.getPrenom() != null && u.getPrenom().toLowerCase().contains(query)) ||
+                                (u.getTelephone() != null && u.getTelephone().toLowerCase().contains(query))
+                        )
+                        .toList();
             }
 
-            String country = null;
-            int orgCount = 0;
-            long menusCount = 0L;
-            try {
-                country = primaryCountryForUser(u);
-                orgCount = organizationsCountForUser(u);
-                menusCount = menusCountForUser(u);
-            } catch (Exception ignored) {
-                // Best-effort: on affiche au moins l'utilisateur même si certaines stats échouent.
+            List<AdminUserDto> out = new ArrayList<>();
+            for (User u : users) {
+                SubscriptionInfo sub;
+                try {
+                    sub = getSubscriptionInfo(u);
+                } catch (Exception ignored) {
+                    sub = new SubscriptionInfo("ERROR", null);
+                }
+
+                String country = null;
+                int orgCount = 0;
+                long menusCount = 0L;
+                try {
+                    country = primaryCountryForUser(u);
+                    orgCount = organizationsCountForUser(u);
+                    menusCount = menusCountForUser(u);
+                } catch (Exception ignored) {
+                    // Best-effort: on affiche au moins l'utilisateur même si certaines stats échouent.
+                }
+
+                String photo = profilePhotoBase64(u);
+
+                out.add(new AdminUserDto(
+                        u.getId(),
+                        u.getNom(),
+                        u.getPrenom(),
+                        u.getEmail(),
+                        u.getTelephone(),
+                        country,
+                        orgCount,
+                        menusCount,
+                        sub.status(),
+                        sub.plan(),
+                        u.isSubscriptionBypass(),
+                        photo
+                ));
             }
-
-            String photo = profilePhotoBase64(u);
-
-            out.add(new AdminUserDto(
-                    u.getId(),
-                    u.getNom(),
-                    u.getPrenom(),
-                    u.getEmail(),
-                    u.getTelephone(),
-                    country,
-                    orgCount,
-                    menusCount,
-                    sub.status(),
-                    sub.plan(),
-                    u.isSubscriptionBypass(),
-                    photo
-            ));
+            return out;
+        } catch (Exception e) {
+            // On ne veut jamais casser l'écran admin.
+            return new ArrayList<>();
         }
-        return out;
     }
 
     @PostMapping("/users")
