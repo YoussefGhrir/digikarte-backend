@@ -8,6 +8,8 @@ import ghrir.digikarte.entity.Organization;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ public class MenuService {
 
     private final MenuRepository menuRepository;
     private final OrganizationRepository organizationRepository;
+    private final CacheManager cacheManager;
 
     @Transactional(readOnly = true)
     public List<MenuDto> findByOrganizationId(Long organizationId, Long userId) {
@@ -89,7 +92,15 @@ public class MenuService {
         if (displayTemplate != null) menu.setDisplayTemplate(displayTemplate);
         if (priceCurrency != null && !priceCurrency.isBlank()) menu.setPriceCurrency(priceCurrency.trim().toUpperCase());
         // slug intentionnellement jamais modifié : le QR /menu/{slug} reste valide à vie
-        return toDto(menuRepository.save(menu));
+        Menu saved = menuRepository.save(menu);
+
+        // Invalide le cache du menu public pour que le changement de template s’applique immédiatement au QR.
+        Cache publicMenus = cacheManager.getCache("publicMenus");
+        if (publicMenus != null && saved.getSlug() != null) {
+            publicMenus.evict(saved.getSlug());
+        }
+
+        return toDto(saved);
     }
 
     @Transactional
