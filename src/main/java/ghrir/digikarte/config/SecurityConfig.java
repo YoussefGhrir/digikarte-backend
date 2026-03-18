@@ -44,9 +44,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Autoriser les appels depuis le frontend local et déployé (Heroku / Vercel, etc.)
-        // En production tu pourras restreindre à tes domaines exacts si tu veux.
-        config.setAllowedOriginPatterns(List.of("*"));
+        // Autoriser explicitement le frontend local (et plus tard tes domaines de prod)
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
