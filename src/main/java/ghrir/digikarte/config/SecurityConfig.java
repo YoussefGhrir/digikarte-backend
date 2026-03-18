@@ -44,13 +44,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Autoriser explicitement le frontend local (et plus tard tes domaines de prod)
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000"
-        ));
+        // Ouvert comme dans success-driving: toutes origines autorisées
+        config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+        // Pas de cookies cross-site, mais OK pour Authorization: Bearer
+        config.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
