@@ -233,6 +233,12 @@ public class AdminController {
         requireAdmin(authentication);
         try {
             List<User> users = userRepository.findAll();
+            // On exclut le compte owner/admin du tableau.
+            // (C'est l'utilisateur connecté qui doit rester "lui-même" dans la sidebar, pas dans la gestion users.)
+            users = users.stream()
+                    .filter(u -> u.getEmail() == null || !u.getEmail().equalsIgnoreCase(AdminBootstrapService.DEFAULT_ADMIN_EMAIL))
+                    .toList();
+
             String query = q != null ? q.trim().toLowerCase() : null;
             if (query != null && !query.isBlank()) {
                 users = users.stream().filter(u ->
