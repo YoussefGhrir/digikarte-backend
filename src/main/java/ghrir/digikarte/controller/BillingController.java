@@ -127,9 +127,11 @@ public class BillingController {
     }
 
     @PostMapping("/me/payment-portal")
-    public ResponseEntity<Map<String, String>> openPaymentPortal(HttpServletRequest request) throws StripeException {
+    public ResponseEntity<Map<String, String>> openPaymentPortal(@RequestBody Map<String, String> body,
+                                                                 HttpServletRequest request) throws StripeException {
         User user = getCurrentUser(request);
         String customerId = user.getStripeCustomerId();
+        String locale = body.getOrDefault("locale", "fr");
 
         if (customerId == null || customerId.isBlank()) {
             return ResponseEntity.badRequest().build();
@@ -137,7 +139,8 @@ public class BillingController {
 
         String portalUrl = billingService.createBillingPortalSession(
                 customerId,
-                "http://localhost:3000/dashboard/subscription"
+                "http://localhost:3000/dashboard/subscription",
+                locale
         );
 
         return ResponseEntity.ok(Map.of("url", portalUrl));

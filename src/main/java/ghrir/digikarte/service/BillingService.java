@@ -99,11 +99,17 @@ public class BillingService {
         return Webhook.constructEvent(payload, sigHeader, webhookSecret);
     }
 
-    public String createBillingPortalSession(String customerId, String returnUrl) throws StripeException {
+    public String createBillingPortalSession(String customerId, String returnUrl, String locale) throws StripeException {
+        com.stripe.param.billingportal.SessionCreateParams.Locale portalLocale =
+                "de".equalsIgnoreCase(locale) ? com.stripe.param.billingportal.SessionCreateParams.Locale.DE :
+                "en".equalsIgnoreCase(locale) ? com.stripe.param.billingportal.SessionCreateParams.Locale.EN :
+                com.stripe.param.billingportal.SessionCreateParams.Locale.FR;
+
         com.stripe.param.billingportal.SessionCreateParams params =
                 com.stripe.param.billingportal.SessionCreateParams.builder()
                         .setCustomer(customerId)
                         .setReturnUrl(returnUrl)
+                        .setLocale(portalLocale)
                         .build();
         com.stripe.model.billingportal.Session session =
                 com.stripe.model.billingportal.Session.create(params);
