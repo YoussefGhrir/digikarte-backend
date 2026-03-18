@@ -358,32 +358,72 @@ public class AdminController {
             Authentication authentication
     ) {
         requireAdmin(authentication);
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            if (request.getNom() != null && !request.getNom().isBlank()) user.setNom(request.getNom().trim());
+            if (request.getPrenom() != null && !request.getPrenom().isBlank()) user.setPrenom(request.getPrenom().trim());
+            if (request.getTelephone() != null && !request.getTelephone().isBlank()) user.setTelephone(request.getTelephone().trim());
+            if (request.getSubscriptionBypass() != null) user.setSubscriptionBypass(request.getSubscriptionBypass());
 
-        if (request.getNom() != null && !request.getNom().isBlank()) user.setNom(request.getNom().trim());
-        if (request.getPrenom() != null && !request.getPrenom().isBlank()) user.setPrenom(request.getPrenom().trim());
-        if (request.getTelephone() != null && !request.getTelephone().isBlank()) user.setTelephone(request.getTelephone().trim());
-        if (request.getSubscriptionBypass() != null) user.setSubscriptionBypass(request.getSubscriptionBypass());
+            userRepository.save(user);
 
-        userRepository.save(user);
+            SubscriptionInfo sub;
+            try {
+                sub = getSubscriptionInfo(user);
+            } catch (Exception ignored) {
+                sub = new SubscriptionInfo("ERROR", null);
+            }
 
-        SubscriptionInfo sub = getSubscriptionInfo(user);
-        return new AdminUserDto(
-                user.getId(),
-                user.getNom(),
-                user.getPrenom(),
-                user.getEmail(),
-                user.getTelephone(),
-                primaryCountryForUser(user),
-                organizationsCountForUser(user),
-                menusCountForUser(user),
-                sub.status(),
-                sub.plan(),
-                user.isSubscriptionBypass(),
-                profilePhotoBase64(user)
-        );
+            String country;
+            int orgCount;
+            long menusCount;
+            try {
+                country = primaryCountryForUser(user);
+                orgCount = organizationsCountForUser(user);
+                menusCount = menusCountForUser(user);
+            } catch (Exception ignored) {
+                country = null;
+                orgCount = 0;
+                menusCount = 0L;
+            }
+
+            return new AdminUserDto(
+                    user.getId(),
+                    user.getNom(),
+                    user.getPrenom(),
+                    user.getEmail(),
+                    user.getTelephone(),
+                    country,
+                    orgCount,
+                    menusCount,
+                    sub.status(),
+                    sub.plan(),
+                    user.isSubscriptionBypass(),
+                    profilePhotoBase64(user)
+            );
+        } catch (Exception e) {
+            // Ne jamais remonter un 500 brut côté admin : on renvoie un DTO minimal.
+            // (Le frontend va quand même pouvoir rafraîchir la table.)
+            User user = userRepository.findById(id).orElse(null);
+            if (user == null) throw e;
+
+            return new AdminUserDto(
+                    user.getId(),
+                    user.getNom(),
+                    user.getPrenom(),
+                    user.getEmail(),
+                    user.getTelephone(),
+                    primaryCountryForUser(user),
+                    0,
+                    0L,
+                    "ERROR",
+                    null,
+                    user.isSubscriptionBypass(),
+                    profilePhotoBase64(user)
+            );
+        }
     }
 
     @PostMapping("/users/{id}/password")
