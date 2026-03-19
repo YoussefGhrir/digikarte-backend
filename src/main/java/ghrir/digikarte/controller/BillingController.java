@@ -94,6 +94,16 @@ public class BillingController {
                     "message", e.getMessage()
             ));
         } catch (StripeException e) {
+            String code = e.getCode();
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if ("api_key_expired".equals(code) || "invalid_api_key".equals(code) || "authentication_error".equals(code)) {
+                log.error("Stripe auth error while creating checkout session. code={}, msg={}", code, msg);
+                return ResponseEntity.status(503).body(Map.of(
+                        "message", "Billing temporairement indisponible (configuration Stripe).",
+                        "code", "STRIPE_AUTH_ERROR"
+                ));
+            }
+
             // Cas fréquent en test : le customer Stripe a été supprimé manuellement.
             if ("resource_missing".equals(e.getCode())
                     && e.getMessage() != null
