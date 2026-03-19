@@ -11,6 +11,7 @@ import ghrir.digikarte.entity.User;
 import ghrir.digikarte.repository.UserRepository;
 import ghrir.digikarte.security.JwtService;
 import ghrir.digikarte.service.BillingService;
+import ghrir.digikarte.util.RouteLocaleUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -207,7 +208,7 @@ public class BillingController {
 
         String portalUrl = billingService.createBillingPortalSession(
                 customerId,
-                frontendUrl("/dashboard/subscription"),
+                frontendUrl(RouteLocaleUtil.prefixedPath(locale, "/dashboard/subscription")),
                 locale
         );
 

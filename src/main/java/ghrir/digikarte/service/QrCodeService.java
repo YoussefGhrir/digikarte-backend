@@ -6,6 +6,8 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import ghrir.digikarte.util.FrontendUrlUtil;
+import ghrir.digikarte.util.RouteLocaleUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,23 +21,26 @@ public class QrCodeService {
     @Value("${frontend.url:https://www.digi-karte.com}")
     private String frontendUrl;
 
-    /**
-     * Génère une image QR code en PNG (format par défaut).
-     * @param slug slug du menu (URL relative sera /menu/[slug])
-     * @param size taille en pixels (carré)
-     * @return bytes PNG
-     */
-    public byte[] generatePng(String slug, int size) throws Exception {
-        String url = frontendUrl + "/menu/" + slug;
-        return generateQrPng(url, size, null);
+    private String menuPublicUrl(String slug, String routeLocale) {
+        String loc = RouteLocaleUtil.sanitize(routeLocale);
+        return FrontendUrlUtil.join(
+                frontendUrl,
+                RouteLocaleUtil.prefixedPath(loc, "/menu/" + slug)
+        );
     }
 
     /**
-     * Génère un QR avec niveau de correction d'erreur (pour différents "modèles" côté backend).
-     * L=7%, M=15%, Q=25%, H=30%
+     * @param routeLocale langue courante UI (de/fr/en), jamais déduite du pays côté backend.
      */
-    public byte[] generatePngWithErrorLevel(String slug, int size, String errorLevel) throws Exception {
-        String url = frontendUrl + "/menu/" + slug;
+    public byte[] generatePng(String slug, String routeLocale, int size) throws Exception {
+        return generateQrPng(menuPublicUrl(slug, routeLocale), size, null);
+    }
+
+    /**
+     * @param routeLocale langue courante UI (de/fr/en).
+     */
+    public byte[] generatePngWithErrorLevel(String slug, String routeLocale, int size, String errorLevel) throws Exception {
+        String url = menuPublicUrl(slug, routeLocale);
         ErrorCorrectionLevel level = parseErrorLevel(errorLevel);
         return generateQrPng(url, size, level);
     }
@@ -65,8 +70,8 @@ public class QrCodeService {
         };
     }
 
-    /** URL publique du menu (slug immutable côté entity → lien fixe à vie, adapté à l’impression QR). */
-    public String getMenuPublicUrl(String slug) {
-        return frontendUrl + "/menu/" + slug;
+    /** URL publique du menu avec préfixe /{locale}/ selon la langue courante. */
+    public String getMenuPublicUrl(String slug, String routeLocale) {
+        return menuPublicUrl(slug, routeLocale);
     }
 }

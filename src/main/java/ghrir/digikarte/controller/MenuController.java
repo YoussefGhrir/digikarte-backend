@@ -1,10 +1,12 @@
 package ghrir.digikarte.controller;
 
 import ghrir.digikarte.dto.MenuDto;
+import ghrir.digikarte.repository.UserRepository;
 import ghrir.digikarte.service.MenuService;
 import ghrir.digikarte.service.QrCodeService;
-import ghrir.digikarte.repository.UserRepository;
+import ghrir.digikarte.util.RouteLocaleUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,13 +23,33 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MenuController {
 
+    private static final String LOCALE_HEADER = "X-DigiKarte-Locale";
+
     private final MenuService menuService;
     private final QrCodeService qrCodeService;
     private final UserRepository userRepository;
 
+    /**
+     * Uniquement si le front n’envoie ni ?locale= ni l’en-tête {@value #LOCALE_HEADER}.
+     * Pas de géolocalisation : la langue par pays est gérée côté frontend / middleware.
+     */
+    @Value("${app.route-locale.fallback:de}")
+    private String routeLocaleFallback;
+
     private Long currentUserId(UserDetails user) {
         if (user == null) return null;
         return userRepository.findByEmail(user.getUsername()).map(u -> u.getId()).orElse(null);
+    }
+
+    /** Langue courante pour préfixer /de/ /fr/ /en/ dans les URLs (QR, liens menu). */
+    private String resolveRouteLocale(String queryLocale, String headerLocale) {
+        if (queryLocale != null && !queryLocale.isBlank()) {
+            return RouteLocaleUtil.sanitize(queryLocale);
+        }
+        if (headerLocale != null && !headerLocale.isBlank()) {
+            return RouteLocaleUtil.sanitize(headerLocale);
+        }
+        return RouteLocaleUtil.sanitize(routeLocaleFallback);
     }
 
     @GetMapping
@@ -139,14 +161,17 @@ public class MenuController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "256") int size,
             @RequestParam(required = false) String mode,
+            @RequestParam(name = "locale", required = false) String locale,
+            @RequestHeader(value = LOCALE_HEADER, required = false) String localeHeader,
             @AuthenticationPrincipal UserDetails user) {
         Long userId = currentUserId(user);
         if (userId == null) return ResponseEntity.status(401).build();
         MenuDto menu = menuService.getById(id, userId);
+        String routeLoc = resolveRouteLocale(locale, localeHeader);
         try {
-            byte[] png = "high".equalsIgnoreCase(mode) ? qrCodeService.generatePngWithErrorLevel(menu.getSlug(), size, "H")
-                    : "low".equalsIgnoreCase(mode) ? qrCodeService.generatePngWithErrorLevel(menu.getSlug(), size, "L")
-                    : qrCodeService.generatePng(menu.getSlug(), size);
+            byte[] png = "high".equalsIgnoreCase(mode) ? qrCodeService.generatePngWithErrorLevel(menu.getSlug(), routeLoc, size, "H")
+                    : "low".equalsIgnoreCase(mode) ? qrCodeService.generatePngWithErrorLevel(menu.getSlug(), routeLoc, size, "L")
+                    : qrCodeService.generatePng(menu.getSlug(), routeLoc, size);
             return ResponseEntity.ok()
                     .contentType(MediaType.IMAGE_PNG)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"menu-" + menu.getSlug() + ".png\"")
@@ -157,11 +182,16 @@ public class MenuController {
     }
 
     @GetMapping("/{id}/qr-url")
-    public ResponseEntity<Map<String, String>> getQrUrl(@PathVariable Long id, @AuthenticationPrincipal UserDetails user) {
+    public ResponseEntity<Map<String, String>> getQrUrl(
+            @PathVariable Long id,
+            @RequestParam(name = "locale", required = false) String locale,
+            @RequestHeader(value = LOCALE_HEADER, required = false) String localeHeader,
+            @AuthenticationPrincipal UserDetails user) {
         Long userId = currentUserId(user);
         if (userId == null) return ResponseEntity.status(401).build();
         MenuDto menu = menuService.getById(id, userId);
-        String url = qrCodeService.getMenuPublicUrl(menu.getSlug());
+        String routeLoc = resolveRouteLocale(locale, localeHeader);
+        String url = qrCodeService.getMenuPublicUrl(menu.getSlug(), routeLoc);
         return ResponseEntity.ok(Map.of("url", url, "slug", menu.getSlug()));
     }
 }

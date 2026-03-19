@@ -53,7 +53,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Autoriser uniquement les origines configurées (pas de localhost hardcodé).
+        // Origines = schéma + hôte (+ port) ; le path (/de/, /fr/…) n’entre pas en jeu pour CORS.
         List<String> patterns = List.of(corsAllowedOriginPatterns.split("\\s*,\\s*"));
         config.setAllowedOriginPatterns(patterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

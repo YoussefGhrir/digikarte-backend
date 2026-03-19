@@ -8,8 +8,11 @@ import ghrir.digikarte.exception.ImageTooLargeException;
 import ghrir.digikarte.service.AuthService;
 import ghrir.digikarte.service.ProfilePhotoService;
 import ghrir.digikarte.service.GoogleOAuthService;
+import ghrir.digikarte.util.FrontendUrlUtil;
+import ghrir.digikarte.util.RouteLocaleUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +28,9 @@ public class AuthController {
     private final AuthService authService;
     private final ProfilePhotoService profilePhotoService;
     private final GoogleOAuthService googleOAuthService;
+
+    @Value("${frontend.url:https://digi-karte.com}")
+    private String frontendBaseUrl;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -118,13 +124,14 @@ public class AuthController {
         }
 
         boolean registerFlow = "register".equalsIgnoreCase(source);
+        String routeLang = RouteLocaleUtil.sanitize(lang);
 
         try {
             AuthResponse auth = googleOAuthService.handleCallback(code, registerFlow);
 
-            String redirect = "https://www.digi-karte.com/login"
+            String redirect = FrontendUrlUtil.join(frontendBaseUrl, RouteLocaleUtil.prefixedPath(routeLang, "/login"))
                     + "?googleToken=" + java.net.URLEncoder.encode(auth.getToken(), java.nio.charset.StandardCharsets.UTF_8)
-                    + "&lang=" + java.net.URLEncoder.encode(lang, java.nio.charset.StandardCharsets.UTF_8)
+                    + "&lang=" + java.net.URLEncoder.encode(routeLang, java.nio.charset.StandardCharsets.UTF_8)
                     + "&email=" + java.net.URLEncoder.encode(auth.getEmail(), java.nio.charset.StandardCharsets.UTF_8)
                     + (registerFlow ? "&justRegistered=1" : "");
 
@@ -135,9 +142,9 @@ public class AuthController {
             String msg = ex.getMessage();
             if (registerFlow && msg != null && msg.startsWith("EMAIL_ALREADY_EXISTS:")) {
                 String email = msg.substring("EMAIL_ALREADY_EXISTS:".length());
-                String redirect = "https://www.digi-karte.com/register"
+                String redirect = FrontendUrlUtil.join(frontendBaseUrl, RouteLocaleUtil.prefixedPath(routeLang, "/register"))
                         + "?googleError=EMAIL_ALREADY_EXISTS"
-                        + "&lang=" + java.net.URLEncoder.encode(lang, java.nio.charset.StandardCharsets.UTF_8)
+                        + "&lang=" + java.net.URLEncoder.encode(routeLang, java.nio.charset.StandardCharsets.UTF_8)
                         + "&email=" + java.net.URLEncoder.encode(email, java.nio.charset.StandardCharsets.UTF_8);
 
                 return ResponseEntity.status(302)
@@ -145,13 +152,10 @@ public class AuthController {
                         .build();
             }
 
-            String baseRedirect = registerFlow
-                    ? "https://www.digi-karte.com/register"
-                    : "https://www.digi-karte.com/login";
-
-            String redirect = baseRedirect
+            String path = registerFlow ? "/register" : "/login";
+            String redirect = FrontendUrlUtil.join(frontendBaseUrl, RouteLocaleUtil.prefixedPath(routeLang, path))
                     + "?googleError=OAUTH_FAILED"
-                    + "&lang=" + java.net.URLEncoder.encode(lang, java.nio.charset.StandardCharsets.UTF_8);
+                    + "&lang=" + java.net.URLEncoder.encode(routeLang, java.nio.charset.StandardCharsets.UTF_8);
 
             return ResponseEntity.status(302)
                     .header("Location", redirect)

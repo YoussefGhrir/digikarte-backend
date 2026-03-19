@@ -11,6 +11,7 @@ import com.stripe.param.checkout.SessionRetrieveParams;
 import com.stripe.param.InvoiceListParams;
 import com.stripe.param.SubscriptionUpdateParams;
 import com.stripe.param.checkout.SessionCreateParams;
+import ghrir.digikarte.util.RouteLocaleUtil;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -114,10 +115,12 @@ public class BillingService {
                 "en".equalsIgnoreCase(locale) ? SessionCreateParams.Locale.EN :
                 SessionCreateParams.Locale.FR;
 
+        String successPath = RouteLocaleUtil.prefixedPath(locale, "/dashboard/subscription?success=1&session_id={CHECKOUT_SESSION_ID}");
+        String cancelPath = RouteLocaleUtil.prefixedPath(locale, "/dashboard/subscription?canceled=1");
         SessionCreateParams.Builder builder = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
-                .setSuccessUrl(frontendUrl("/dashboard/subscription?success=1&session_id={CHECKOUT_SESSION_ID}"))
-                .setCancelUrl(frontendUrl("/dashboard/subscription?canceled=1"))
+                .setSuccessUrl(frontendUrl(successPath))
+                .setCancelUrl(frontendUrl(cancelPath))
                 .setClientReferenceId(String.valueOf(userId))
                 .addLineItem(
                         SessionCreateParams.LineItem.builder()
