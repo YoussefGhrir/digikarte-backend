@@ -4,6 +4,7 @@ import ghrir.digikarte.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -34,6 +35,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
+                        // CORS preflight (OPTIONS) doit être autorisé sinon le browser n'obtient pas les headers CORS
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .headers(headers -> headers.frameOptions(f -> f.sameOrigin()))
@@ -44,8 +47,15 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Ouvert comme dans success-driving: toutes origines autorisées
-        config.setAllowedOriginPatterns(List.of("*"));
+        // Autoriser uniquement le domaine custom (et quelques origines de dev).
+        config.setAllowedOriginPatterns(
+                List.of(
+                        "https://digi-karte.com",
+                        "https://www.digi-karte.com",
+                        "https://digikarte-frontend.vercel.app",
+                        "http://localhost:3000"
+                )
+        );
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         // Pas de cookies cross-site, mais OK pour Authorization: Bearer
