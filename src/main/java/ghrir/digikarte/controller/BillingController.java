@@ -358,6 +358,23 @@ public class BillingController {
                         customerId = session.getCustomer() != null ? session.getCustomer().toString() : null;
                         subscriptionId = session.getSubscription() != null ? session.getSubscription().toString() : null;
 
+                        // Fallback: si Stripe ne renvoie pas directement `customer` sur la session,
+                        // on récupère le Subscription pour retrouver le customer.
+                        if ((customerId == null || customerId.isBlank())
+                                && (subscriptionId != null && !subscriptionId.isBlank())) {
+                            try {
+                                Subscription sub = billingService.retrieveSubscription(subscriptionId);
+                                Object subCustomer = sub.getCustomer();
+                                customerId = subCustomer != null ? subCustomer.toString() : null;
+                            } catch (Exception e) {
+                                log.warn(
+                                        "Stripe webhook fallback failed to resolve customer from subscription. eventType={}, subscriptionId={}",
+                                        event.getType(),
+                                        subscriptionId
+                                );
+                            }
+                        }
+
                         if (customerId != null && !customerId.isBlank()) {
                             user.setStripeCustomerId(customerId);
                         }
