@@ -36,7 +36,7 @@ public class BillingController {
     private final UserRepository userRepository;
     private final JwtService jwtService;
 
-    @Value("${frontend.url:http://localhost:3000}")
+    @Value("${frontend.url:https://www.digi-karte.com}")
     private String frontendBaseUrl;
 
     private String frontendUrl(String pathAndQuery) {

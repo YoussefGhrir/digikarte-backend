@@ -16,7 +16,7 @@ import java.util.Map;
 @Service
 public class QrCodeService {
 
-    @Value("${frontend.url:http://localhost:3000}")
+    @Value("${frontend.url:https://www.digi-karte.com}")
     private String frontendUrl;
 
     /**

@@ -38,7 +38,7 @@ public class BillingService {
     @Value("${stripe.webhook-secret}")
     private String webhookSecret;
 
-    @Value("${frontend.url:http://localhost:3000}")
+    @Value("${frontend.url:https://www.digi-karte.com}")
     private String frontendBaseUrl;
 
     @PostConstruct

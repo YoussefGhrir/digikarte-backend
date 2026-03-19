@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 
@@ -24,6 +25,9 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+
+    @Value("${cors.allowed-origin-patterns:https://digi-karte.com,https://www.digi-karte.com,https://digikarte-frontend.vercel.app}")
+    private String corsAllowedOriginPatterns;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -49,15 +53,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Autoriser uniquement le domaine custom (et quelques origines de dev).
-        config.setAllowedOriginPatterns(
-                List.of(
-                        "https://digi-karte.com",
-                        "https://www.digi-karte.com",
-                        "https://digikarte-frontend.vercel.app",
-                        "http://localhost:3000"
-                )
-        );
+        // Autoriser uniquement les origines configurées (pas de localhost hardcodé).
+        List<String> patterns = List.of(corsAllowedOriginPatterns.split("\\s*,\\s*"));
+        config.setAllowedOriginPatterns(patterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         // Pas de cookies cross-site, mais OK pour Authorization: Bearer
