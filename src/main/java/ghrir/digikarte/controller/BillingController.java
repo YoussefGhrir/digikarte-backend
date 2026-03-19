@@ -349,9 +349,10 @@ public class BillingController {
                     String customerId = null;
                     String subscriptionId = null;
                     try {
-                        userId = Long.valueOf(clientRef);
-                        User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé: " + userId));
+                        final Long parsedUserId = Long.valueOf(clientRef);
+                        userId = parsedUserId;
+                        User user = userRepository.findById(parsedUserId)
+                                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé: " + parsedUserId));
 
                         // customer + subscription sont en général présentes sur une session checkout complétée
                         customerId = session.getCustomer() != null ? session.getCustomer().toString() : null;
