@@ -217,6 +217,23 @@ public class BillingController {
     @GetMapping("/me/subscription")
     public ResponseEntity<SubscriptionDto> getMySubscription(HttpServletRequest request) throws StripeException {
         User user = getCurrentUser(request);
+
+        // Bypass admin (VIP): statut actif permanent, indépendant de Stripe.
+        if (user.isSubscriptionBypass()) {
+            SubscriptionDto bypassDto = SubscriptionDto.builder()
+                    .plan("VIP")
+                    .status("ACTIVE")
+                    .trialEnd(null)
+                    .currentPeriodStart(null)
+                    .currentPeriodEnd(null)
+                    .nextPaymentAt(null)
+                    .autoRenew(false)
+                    .currency("EUR")
+                    .amount(0.0)
+                    .build();
+            return ResponseEntity.ok(bypassDto);
+        }
+
         String stripeSubId = user.getStripeSubscriptionId();
 
         if (stripeSubId == null || stripeSubId.isBlank()) {

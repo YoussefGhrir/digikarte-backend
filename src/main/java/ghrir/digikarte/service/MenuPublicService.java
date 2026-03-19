@@ -41,6 +41,25 @@ public class MenuPublicService {
         dto.setDisplayTemplate(menu.getDisplayTemplate());
         dto.setPriceCurrency(menu.getPriceCurrency() != null ? menu.getPriceCurrency() : "EUR");
 
+        // Bypass admin (VIP): accès permanent même sans abonnement Stripe actif.
+        if (org.getOwner() != null && org.getOwner().isSubscriptionBypass()) {
+            dto.setAvailable(true);
+            dto.setUnavailableReason(null);
+            dto.setItems(menu.getItems().stream().map(item -> {
+                MenuItemDto i = new MenuItemDto();
+                i.setId(item.getId());
+                i.setName(item.getName());
+                i.setDescription(item.getDescription());
+                i.setPrice(item.getPrice());
+                i.setImageUrl(item.getImageUrl());
+                i.setSection(item.getSection());
+                i.setSortOrder(item.getSortOrder());
+                i.setParentItemId(item.getParentItemId());
+                return i;
+            }).collect(Collectors.toList()));
+            return dto;
+        }
+
         // Vérifie que le propriétaire possède un abonnement actif ou en essai.
         // Si pas OK => mode indisponible (on ne jette pas d'exception, pour que la page affiche un message + pub).
         boolean subscriptionOk = false;

@@ -56,6 +56,11 @@ public class AdminController {
     private record SubscriptionInfo(String status, String plan) {}
 
     private SubscriptionInfo getSubscriptionInfo(User user) {
+        // Bypass admin (VIP): toujours actif côté admin.
+        if (user.isSubscriptionBypass()) {
+            return new SubscriptionInfo("ACTIVE", "VIP");
+        }
+
         String subId = user.getStripeSubscriptionId();
         if (subId == null || subId.isBlank()) {
             return new SubscriptionInfo("NO_SUBSCRIPTION", null);
