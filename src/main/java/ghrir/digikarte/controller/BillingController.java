@@ -193,6 +193,11 @@ public class BillingController {
             // Si la subscription Stripe n'existe plus (ou IDs incohérents), on nettoie en DB
             String code = e.getCode();
             String msg = e.getMessage() != null ? e.getMessage() : "";
+            if ("api_key_expired".equals(code) || "invalid_api_key".equals(code) || "authentication_error".equals(code)) {
+                // Clé Stripe révoquée/invalidée => impossible de lire abonnement et factures
+                log.error("Stripe auth error while retrieving subscription. code={}, msg={}", code, msg);
+                return ResponseEntity.status(503).build();
+            }
             if ("resource_missing".equals(code) && msg.toLowerCase().contains("no such subscription")) {
                 user.setStripeSubscriptionId(null);
                 // le customer peut encore être valide, on le garde
@@ -331,6 +336,10 @@ public class BillingController {
         } catch (StripeException e) {
             String code = e.getCode();
             String msg = e.getMessage() != null ? e.getMessage() : "";
+            if ("api_key_expired".equals(code) || "invalid_api_key".equals(code) || "authentication_error".equals(code)) {
+                log.error("Stripe auth error while retrieving invoices. code={}, msg={}", code, msg);
+                return ResponseEntity.status(503).build();
+            }
             if ("resource_missing".equals(code) && msg.toLowerCase().contains("no such customer")) {
                 // IDs client incohérents => on nettoie et on évite 500
                 user.setStripeCustomerId(null);
