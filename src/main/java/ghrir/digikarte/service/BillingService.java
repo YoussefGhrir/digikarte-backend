@@ -40,14 +40,31 @@ public class BillingService {
 
     @PostConstruct
     public void init() {
+        // Stripe est optionnel pour démarrer l'appli (login, dashboard, etc.).
+        // Les endpoints billing échoueront à l'exécution si les clés ne sont pas configurées.
         if (stripeSecretKey == null || stripeSecretKey.isBlank()) {
-            throw new IllegalStateException(
-                    "Stripe secret key is missing. Set `STRIPE_SECRET_KEY` (value starts with `sk_...`) " +
-                            "in your environment/Config Vars. " +
-                            "If you only set a `pk_...` publishable key, that's for the frontend and won't work here."
+            log.warn(
+                    "Stripe not configured (stripe.secret-key is empty). Billing endpoints will be disabled until you set STRIPE_SECRET_KEY + price ids + webhook secret."
             );
+            return;
         }
         log.info("Stripe secret key configured (non-empty).");
+        Stripe.apiKey = stripeSecretKey;
+    }
+
+    private void ensureStripeConfigured() {
+        if (stripeSecretKey == null || stripeSecretKey.isBlank()) {
+            throw new IllegalStateException("Stripe is not configured (missing STRIPE_SECRET_KEY).");
+        }
+        if (monthlyPriceId == null || monthlyPriceId.isBlank()
+                || semiannualPriceId == null || semiannualPriceId.isBlank()
+                || yearlyPriceId == null || yearlyPriceId.isBlank()) {
+            throw new IllegalStateException("Stripe is not configured (missing one or more price ids).");
+        }
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            throw new IllegalStateException("Stripe is not configured (missing STRIPE_WEBHOOK_SECRET).");
+        }
+        // Assure la clé au cas où init() n'a pas pu la configurer
         Stripe.apiKey = stripeSecretKey;
     }
 
@@ -59,6 +76,7 @@ public class BillingService {
             String existingCustomerId,
             boolean hasExistingSubscription
     ) throws StripeException {
+        ensureStripeConfigured();
         String priceId = switch (plan) {
             case "MONTHLY" -> monthlyPriceId;
             case "SEMIANNUAL" -> semiannualPriceId;
@@ -108,10 +126,12 @@ public class BillingService {
     }
 
     public Event constructEventFromWebhook(String payload, String sigHeader) throws Exception {
+        ensureStripeConfigured();
         return Webhook.constructEvent(payload, sigHeader, webhookSecret);
     }
 
     public String createBillingPortalSession(String customerId, String returnUrl, String locale) throws StripeException {
+        ensureStripeConfigured();
         com.stripe.param.billingportal.SessionCreateParams.Locale portalLocale =
                 "de".equalsIgnoreCase(locale) ? com.stripe.param.billingportal.SessionCreateParams.Locale.DE :
                 "en".equalsIgnoreCase(locale) ? com.stripe.param.billingportal.SessionCreateParams.Locale.EN :
@@ -129,6 +149,7 @@ public class BillingService {
     }
 
     public Subscription retrieveSubscription(String subscriptionId) throws StripeException {
+        ensureStripeConfigured();
         return Subscription.retrieve(subscriptionId);
     }
 
@@ -137,6 +158,7 @@ public class BillingService {
     }
 
     public List<Invoice> listInvoicesForCustomer(String customerId, long limit) throws StripeException {
+        ensureStripeConfigured();
         InvoiceListParams params = InvoiceListParams.builder()
                 .setCustomer(customerId)
                 .setLimit(limit)
@@ -148,6 +170,7 @@ public class BillingService {
      * Annule immédiatement un abonnement Stripe (utilisé pour stopper un essai ou un abonnement).
      */
     public Subscription cancelSubscriptionNow(String subscriptionId) throws StripeException {
+        ensureStripeConfigured();
         Subscription subscription = Subscription.retrieve(subscriptionId);
         return subscription.cancel();
     }
@@ -157,6 +180,7 @@ public class BillingService {
      * Stripe passe alors à la période payante du plan choisi.
      */
     public Subscription endTrialNow(String subscriptionId) throws StripeException {
+        ensureStripeConfigured();
         SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
                 .setTrialEnd(SubscriptionUpdateParams.TrialEnd.NOW)
                 .build();
@@ -168,6 +192,7 @@ public class BillingService {
      * L'utilisateur garde l'accès jusqu'à la fin de la période déjà payée.
      */
     public Subscription cancelAtPeriodEnd(String subscriptionId) throws StripeException {
+        ensureStripeConfigured();
         SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
                 .setCancelAtPeriodEnd(true)
                 .build();
@@ -179,6 +204,7 @@ public class BillingService {
      * (cancel_at_period_end=false). Ne fonctionne que tant que la période n'est pas terminée.
      */
     public Subscription reactivateAutoRenew(String subscriptionId) throws StripeException {
+        ensureStripeConfigured();
         SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
                 .setCancelAtPeriodEnd(false)
                 .build();
