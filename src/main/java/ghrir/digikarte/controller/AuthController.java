@@ -116,7 +116,8 @@ public class AuthController {
             String redirect = "https://www.digi-karte.com/login"
                     + "?googleToken=" + java.net.URLEncoder.encode(auth.getToken(), java.nio.charset.StandardCharsets.UTF_8)
                     + "&lang=" + java.net.URLEncoder.encode(lang, java.nio.charset.StandardCharsets.UTF_8)
-                    + "&email=" + java.net.URLEncoder.encode(auth.getEmail(), java.nio.charset.StandardCharsets.UTF_8);
+                    + "&email=" + java.net.URLEncoder.encode(auth.getEmail(), java.nio.charset.StandardCharsets.UTF_8)
+                    + (registerFlow ? "&justRegistered=1" : "");
 
             return ResponseEntity.status(302)
                     .header("Location", redirect)
