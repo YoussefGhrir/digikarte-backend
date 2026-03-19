@@ -105,7 +105,8 @@ public class GoogleOAuthService {
                     .email(email)
                     .prenom(givenName)
                     .nom(familyName)
-                    .telephone(null)
+                    .telephone("N/A")
+                    .password(java.util.UUID.randomUUID().toString())
                     .build();
         }
         user = userRepository.save(user);
