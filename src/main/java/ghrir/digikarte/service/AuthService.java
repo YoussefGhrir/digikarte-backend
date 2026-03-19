@@ -40,17 +40,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .build();
         user = userRepository.save(user);
-        String token = jwtService.generateToken(user.getEmail(), user.getId());
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .nom(user.getNom())
-                .prenom(user.getPrenom())
-                .userId(user.getId())
-                .subscriptionBypass(user.isSubscriptionBypass())
-                .admin(user.isAdmin())
-                .superAdmin(user.isSuperAdmin())
-                .build();
+        return generateAuthResponseForUser(user);
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -63,6 +53,10 @@ public class AuthService {
             }
         }
         User user = userRepository.findByEmail(lookup).orElseThrow();
+        return generateAuthResponseForUser(user);
+    }
+
+    public AuthResponse generateAuthResponseForUser(User user) {
         String token = jwtService.generateToken(user.getEmail(), user.getId());
         return AuthResponse.builder()
                 .token(token)

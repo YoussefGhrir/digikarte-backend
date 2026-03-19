@@ -7,6 +7,7 @@ import ghrir.digikarte.dto.RegisterRequest;
 import ghrir.digikarte.exception.ImageTooLargeException;
 import ghrir.digikarte.service.AuthService;
 import ghrir.digikarte.service.ProfilePhotoService;
+import ghrir.digikarte.service.GoogleOAuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final ProfilePhotoService profilePhotoService;
+    private final GoogleOAuthService googleOAuthService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -76,5 +78,31 @@ public class AuthController {
     public ResponseEntity<Void> deleteCurrentUser(Authentication authentication) {
         authService.deleteCurrentUser(authentication);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/google/login")
+    public ResponseEntity<Void> googleLogin(@RequestParam(name = "lang", required = false) String lang) {
+        String url = googleOAuthService.buildGoogleAuthUrl(lang);
+        return ResponseEntity.status(302)
+                .header("Location", url)
+                .build();
+    }
+
+    @GetMapping("/google/callback")
+    public ResponseEntity<Void> googleCallback(
+            @RequestParam("code") String code,
+            @RequestParam(name = "state", required = false) String state
+    ) throws Exception {
+        AuthResponse auth = googleOAuthService.handleCallback(code);
+        String lang = (state != null && !state.isBlank()) ? state : "de";
+
+        String redirect = "https://www.digi-karte.com/login"
+                + "?googleToken=" + java.net.URLEncoder.encode(auth.getToken(), java.nio.charset.StandardCharsets.UTF_8)
+                + "&lang=" + lang
+                + "&email=" + java.net.URLEncoder.encode(auth.getEmail(), java.nio.charset.StandardCharsets.UTF_8);
+
+        return ResponseEntity.status(302)
+                .header("Location", redirect)
+                .build();
     }
 }

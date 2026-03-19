@@ -36,7 +36,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/google/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         // Stripe webhooks ne peuvent pas envoyer un JWT
                         .requestMatchers("/api/billing/webhook").permitAll()
