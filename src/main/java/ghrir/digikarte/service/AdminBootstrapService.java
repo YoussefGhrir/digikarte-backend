@@ -23,20 +23,37 @@ public class AdminBootstrapService {
 
     @PostConstruct
     public void ensureDefaultAdminUserExists() {
-        if (userRepository.existsByEmail(DEFAULT_ADMIN_EMAIL)) return;
+        userRepository.findByEmail(DEFAULT_ADMIN_EMAIL).ifPresentOrElse(existing -> {
+            boolean changed = false;
+            if (!existing.isAdmin()) {
+                existing.setAdmin(true);
+                changed = true;
+            }
+            if (!existing.isSuperAdmin()) {
+                existing.setSuperAdmin(true);
+                changed = true;
+            }
+            if (!existing.isSubscriptionBypass()) {
+                existing.setSubscriptionBypass(true);
+                changed = true;
+            }
+            if (changed) {
+                userRepository.save(existing);
+            }
+        }, () -> {
+            User admin = User.builder()
+                    .nom("Admin")
+                    .prenom("Owner")
+                    .email(DEFAULT_ADMIN_EMAIL)
+                    .telephone("0000000000")
+                    .password(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD))
+                    .subscriptionBypass(true) // accès direct au dashboard admin
+                    .isAdmin(true)
+                    .isSuperAdmin(true)
+                    .build();
 
-        User admin = User.builder()
-                .nom("Admin")
-                .prenom("Owner")
-                .email(DEFAULT_ADMIN_EMAIL)
-                .telephone("0000000000")
-                .password(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD))
-                .subscriptionBypass(true) // accès direct au dashboard admin
-                .isAdmin(true)
-                .isSuperAdmin(true)
-                .build();
-
-        userRepository.save(admin);
+            userRepository.save(admin);
+        });
     }
 }
 
