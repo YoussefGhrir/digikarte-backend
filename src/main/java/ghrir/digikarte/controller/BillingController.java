@@ -358,23 +358,6 @@ public class BillingController {
                         customerId = session.getCustomer() != null ? session.getCustomer().toString() : null;
                         subscriptionId = session.getSubscription() != null ? session.getSubscription().toString() : null;
 
-                        // Fallback: si Stripe ne renvoie pas directement `customer` sur la session,
-                        // on récupère le Subscription pour retrouver le customer.
-                        if ((customerId == null || customerId.isBlank())
-                                && (subscriptionId != null && !subscriptionId.isBlank())) {
-                            try {
-                                Subscription sub = billingService.retrieveSubscription(subscriptionId);
-                                Object subCustomer = sub.getCustomer();
-                                customerId = subCustomer != null ? subCustomer.toString() : null;
-                            } catch (Exception e) {
-                                log.warn(
-                                        "Stripe webhook fallback failed to resolve customer from subscription. eventType={}, subscriptionId={}",
-                                        event.getType(),
-                                        subscriptionId
-                                );
-                            }
-                        }
-
                         if (customerId != null && !customerId.isBlank()) {
                             user.setStripeCustomerId(customerId);
                         }
@@ -383,15 +366,18 @@ public class BillingController {
                         }
 
                         userRepository.save(user);
-                        // Re-read to confirm the fields were persisted correctly.
-                        User saved = userRepository.findById(parsedUserId).orElse(user);
-                        boolean hasCustomerId = saved.getStripeCustomerId() != null && !saved.getStripeCustomerId().isBlank();
-                        boolean hasSubscriptionId = saved.getStripeSubscriptionId() != null && !saved.getStripeSubscriptionId().isBlank();
+                        User reloaded = userRepository.findById(parsedUserId).orElse(user);
                         log.info(
-                                "Stripe webhook updated user billing ids. userId={}, stripeCustomerIdUpdated={}, stripeSubscriptionIdUpdated={}",
+                                "Stripe webhook saved ids (attempt): userId={}, stripeCustomerId={}, stripeSubscriptionId={}",
                                 userId,
-                                hasCustomerId,
-                                hasSubscriptionId
+                                customerId,
+                                subscriptionId
+                        );
+                        log.info(
+                                "Stripe webhook saved ids (db): userId={}, stripeCustomerId={}, stripeSubscriptionId={}",
+                                parsedUserId,
+                                reloaded.getStripeCustomerId(),
+                                reloaded.getStripeSubscriptionId()
                         );
                     } catch (Exception ignored) {
                         // Le webhook doit répondre "ok" même si l'enregistrement en base échoue.

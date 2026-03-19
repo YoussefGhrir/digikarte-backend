@@ -13,11 +13,15 @@ import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 @Service
 public class BillingService {
+
+    private static final Logger log = LoggerFactory.getLogger(BillingService.class);
 
     @Value("${stripe.secret-key}")
     private String stripeSecretKey;
@@ -43,24 +47,7 @@ public class BillingService {
                             "If you only set a `pk_...` publishable key, that's for the frontend and won't work here."
             );
         }
-        // Guard against accidentally using a publishable key (pk_) instead of a secret key (sk_/rk_)
-        if (!(stripeSecretKey.startsWith("sk_") || stripeSecretKey.startsWith("rk_"))) {
-            throw new IllegalStateException(
-                    "Stripe secret key format is invalid. Expected key to start with `sk_` (or `rk_` for restricted keys)."
-            );
-        }
-        if (webhookSecret == null || webhookSecret.isBlank()) {
-            throw new IllegalStateException(
-                    "Stripe webhook secret is missing. Set `STRIPE_WEBHOOK_SECRET` (value starts with `whsec_...`)."
-            );
-        }
-        if (monthlyPriceId == null || monthlyPriceId.isBlank()
-                || semiannualPriceId == null || semiannualPriceId.isBlank()
-                || yearlyPriceId == null || yearlyPriceId.isBlank()) {
-            throw new IllegalStateException(
-                    "One or more Stripe price ids are missing. Expected `stripe.price.monthly`, `stripe.price.semiannual`, `stripe.price.yearly`."
-            );
-        }
+        log.info("Stripe secret key configured (non-empty).");
         Stripe.apiKey = stripeSecretKey;
     }
 
