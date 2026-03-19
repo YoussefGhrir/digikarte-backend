@@ -36,6 +36,31 @@ public class BillingService {
 
     @PostConstruct
     public void init() {
+        if (stripeSecretKey == null || stripeSecretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "Stripe secret key is missing. Set `STRIPE_SECRET_KEY` (value starts with `sk_...`) " +
+                            "in your environment/Config Vars. " +
+                            "If you only set a `pk_...` publishable key, that's for the frontend and won't work here."
+            );
+        }
+        // Guard against accidentally using a publishable key (pk_) instead of a secret key (sk_/rk_)
+        if (!(stripeSecretKey.startsWith("sk_") || stripeSecretKey.startsWith("rk_"))) {
+            throw new IllegalStateException(
+                    "Stripe secret key format is invalid. Expected key to start with `sk_` (or `rk_` for restricted keys)."
+            );
+        }
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "Stripe webhook secret is missing. Set `STRIPE_WEBHOOK_SECRET` (value starts with `whsec_...`)."
+            );
+        }
+        if (monthlyPriceId == null || monthlyPriceId.isBlank()
+                || semiannualPriceId == null || semiannualPriceId.isBlank()
+                || yearlyPriceId == null || yearlyPriceId.isBlank()) {
+            throw new IllegalStateException(
+                    "One or more Stripe price ids are missing. Expected `stripe.price.monthly`, `stripe.price.semiannual`, `stripe.price.yearly`."
+            );
+        }
         Stripe.apiKey = stripeSecretKey;
     }
 
