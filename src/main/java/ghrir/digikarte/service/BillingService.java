@@ -18,6 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class BillingService {
@@ -41,6 +43,11 @@ public class BillingService {
 
     @Value("${frontend.url:https://www.digi-karte.com}")
     private String frontendBaseUrl;
+
+    private static final long SUBSCRIPTION_CACHE_TTL_MS = 15_000L;
+    private final Map<String, CachedSubscription> subscriptionCache = new ConcurrentHashMap<>();
+
+    private record CachedSubscription(Subscription value, long expiresAt) {}
 
     @PostConstruct
     public void init() {
@@ -180,6 +187,23 @@ public class BillingService {
         return Subscription.retrieve(subscriptionId);
     }
 
+    public Subscription retrieveSubscriptionCached(String subscriptionId) throws StripeException {
+        ensureStripeConfigured();
+        long now = System.currentTimeMillis();
+        CachedSubscription cached = subscriptionCache.get(subscriptionId);
+        if (cached != null && cached.expiresAt() > now) {
+            return cached.value();
+        }
+        Subscription fresh = Subscription.retrieve(subscriptionId);
+        subscriptionCache.put(subscriptionId, new CachedSubscription(fresh, now + SUBSCRIPTION_CACHE_TTL_MS));
+        return fresh;
+    }
+
+    private void evictSubscriptionCache(String subscriptionId) {
+        if (subscriptionId == null || subscriptionId.isBlank()) return;
+        subscriptionCache.remove(subscriptionId);
+    }
+
     public List<Invoice> listInvoicesForCustomer(String customerId) throws StripeException {
         return listInvoicesForCustomer(customerId, 10L);
     }
@@ -198,8 +222,11 @@ public class BillingService {
      */
     public Subscription cancelSubscriptionNow(String subscriptionId) throws StripeException {
         ensureStripeConfigured();
+        evictSubscriptionCache(subscriptionId);
         Subscription subscription = Subscription.retrieve(subscriptionId);
-        return subscription.cancel();
+        Subscription updated = subscription.cancel();
+        subscriptionCache.put(subscriptionId, new CachedSubscription(updated, System.currentTimeMillis() + SUBSCRIPTION_CACHE_TTL_MS));
+        return updated;
     }
 
     /**
@@ -208,10 +235,13 @@ public class BillingService {
      */
     public Subscription endTrialNow(String subscriptionId) throws StripeException {
         ensureStripeConfigured();
+        evictSubscriptionCache(subscriptionId);
         SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
                 .setTrialEnd(SubscriptionUpdateParams.TrialEnd.NOW)
                 .build();
-        return Subscription.retrieve(subscriptionId).update(params);
+        Subscription updated = Subscription.retrieve(subscriptionId).update(params);
+        subscriptionCache.put(subscriptionId, new CachedSubscription(updated, System.currentTimeMillis() + SUBSCRIPTION_CACHE_TTL_MS));
+        return updated;
     }
 
     /**
@@ -220,10 +250,13 @@ public class BillingService {
      */
     public Subscription cancelAtPeriodEnd(String subscriptionId) throws StripeException {
         ensureStripeConfigured();
+        evictSubscriptionCache(subscriptionId);
         SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
                 .setCancelAtPeriodEnd(true)
                 .build();
-        return Subscription.retrieve(subscriptionId).update(params);
+        Subscription updated = Subscription.retrieve(subscriptionId).update(params);
+        subscriptionCache.put(subscriptionId, new CachedSubscription(updated, System.currentTimeMillis() + SUBSCRIPTION_CACHE_TTL_MS));
+        return updated;
     }
 
     /**
@@ -232,10 +265,13 @@ public class BillingService {
      */
     public Subscription reactivateAutoRenew(String subscriptionId) throws StripeException {
         ensureStripeConfigured();
+        evictSubscriptionCache(subscriptionId);
         SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
                 .setCancelAtPeriodEnd(false)
                 .build();
-        return Subscription.retrieve(subscriptionId).update(params);
+        Subscription updated = Subscription.retrieve(subscriptionId).update(params);
+        subscriptionCache.put(subscriptionId, new CachedSubscription(updated, System.currentTimeMillis() + SUBSCRIPTION_CACHE_TTL_MS));
+        return updated;
     }
 
     /**

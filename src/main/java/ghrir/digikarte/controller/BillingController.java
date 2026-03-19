@@ -242,7 +242,7 @@ public class BillingController {
         }
 
         try {
-            Subscription s = billingService.retrieveSubscription(stripeSubId);
+            Subscription s = billingService.retrieveSubscriptionCached(stripeSubId);
 
             String status = normalizeStatus(s.getStatus());
             boolean autoRenew = !Boolean.TRUE.equals(s.getCancelAtPeriodEnd());

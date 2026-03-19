@@ -76,7 +76,7 @@ public class AdminController {
             return new SubscriptionInfo("NO_SUBSCRIPTION", null);
         }
         try {
-            Subscription s = billingService.retrieveSubscription(subId);
+            Subscription s = billingService.retrieveSubscriptionCached(subId);
             String status = normalizeStatus(s.getStatus());
 
             String plan = null;

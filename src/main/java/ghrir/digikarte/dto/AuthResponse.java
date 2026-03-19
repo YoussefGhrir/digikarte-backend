@@ -15,4 +15,7 @@ public class AuthResponse {
     private String nom;
     private String prenom;
     private Long userId;
+    private boolean subscriptionBypass;
+    private boolean admin;
+    private boolean superAdmin;
 }

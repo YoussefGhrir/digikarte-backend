@@ -47,6 +47,9 @@ public class AuthService {
                 .nom(user.getNom())
                 .prenom(user.getPrenom())
                 .userId(user.getId())
+                .subscriptionBypass(user.isSubscriptionBypass())
+                .admin(user.isAdmin())
+                .superAdmin(user.isSuperAdmin())
                 .build();
     }
 
@@ -67,6 +70,9 @@ public class AuthService {
                 .nom(user.getNom())
                 .prenom(user.getPrenom())
                 .userId(user.getId())
+                .subscriptionBypass(user.isSubscriptionBypass())
+                .admin(user.isAdmin())
+                .superAdmin(user.isSuperAdmin())
                 .build();
     }
 
