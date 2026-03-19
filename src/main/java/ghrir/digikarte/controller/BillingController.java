@@ -384,6 +384,10 @@ public class BillingController {
 
                         userRepository.save(user);
                         User reloaded = userRepository.findById(parsedUserId).orElse(user);
+
+                        String persistedCustomerId = reloaded.getStripeCustomerId();
+                        String persistedSubscriptionId = reloaded.getStripeSubscriptionId();
+
                         log.info(
                                 "Stripe webhook saved ids (attempt): userId={}, stripeCustomerId={}, stripeSubscriptionId={}",
                                 userId,
@@ -396,6 +400,42 @@ public class BillingController {
                                 reloaded.getStripeCustomerId(),
                                 reloaded.getStripeSubscriptionId()
                         );
+
+                        boolean expectedCustomer = customerId != null && !customerId.isBlank();
+                        boolean expectedSubscription = subscriptionId != null && !subscriptionId.isBlank();
+
+                        boolean customerPersistedOk = !expectedCustomer
+                                || (persistedCustomerId != null && customerId.equals(persistedCustomerId));
+                        boolean subscriptionPersistedOk = !expectedSubscription
+                                || (persistedSubscriptionId != null && subscriptionId.equals(persistedSubscriptionId));
+
+                        if (!customerPersistedOk || !subscriptionPersistedOk) {
+                            log.error(
+                                    "Stripe webhook verification failed (attempted write mismatch). userId={}, expectedCustomerId={}, persistedCustomerId={}, expectedSubscriptionId={}, persistedSubscriptionId={}",
+                                    parsedUserId,
+                                    customerId,
+                                    persistedCustomerId,
+                                    subscriptionId,
+                                    persistedSubscriptionId
+                            );
+
+                            // Retry best-effort: on ré-enregistre les champs attendus si nécessaire.
+                            if (expectedCustomer && !customerPersistedOk) {
+                                reloaded.setStripeCustomerId(customerId);
+                            }
+                            if (expectedSubscription && !subscriptionPersistedOk) {
+                                reloaded.setStripeSubscriptionId(subscriptionId);
+                            }
+
+                            userRepository.save(reloaded);
+                            User reloadedAfterRetry = userRepository.findById(parsedUserId).orElse(reloaded);
+                            log.info(
+                                    "Stripe webhook verification retry (db): userId={}, stripeCustomerId={}, stripeSubscriptionId={}",
+                                    parsedUserId,
+                                    reloadedAfterRetry.getStripeCustomerId(),
+                                    reloadedAfterRetry.getStripeSubscriptionId()
+                            );
+                        }
                     } catch (Exception ignored) {
                         // Le webhook doit répondre "ok" même si l'enregistrement en base échoue.
                         // On évite de casser tout le flux Stripe.
