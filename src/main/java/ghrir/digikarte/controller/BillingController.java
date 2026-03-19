@@ -21,11 +21,15 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/billing")
 @RequiredArgsConstructor
 public class BillingController {
+
+    private static final Logger log = LoggerFactory.getLogger(BillingController.class);
 
     private final BillingService billingService;
     private final UserRepository userRepository;
@@ -331,6 +335,7 @@ public class BillingController {
     public ResponseEntity<String> handleWebhook(@RequestBody String payload,
                                                 @RequestHeader("Stripe-Signature") String sigHeader) throws Exception {
         Event event = billingService.constructEventFromWebhook(payload, sigHeader);
+        log.info("Stripe webhook received: type={}", event.getType());
 
         switch (event.getType()) {
             case "checkout.session.completed" -> {
@@ -340,14 +345,17 @@ public class BillingController {
                 // (dans BillingService on met setClientReferenceId(String.valueOf(userId))).
                 String clientRef = session.getClientReferenceId();
                 if (clientRef != null && !clientRef.isBlank()) {
+                    Long userId = null;
+                    String customerId = null;
+                    String subscriptionId = null;
                     try {
-                        Long userId = Long.valueOf(clientRef);
+                        userId = Long.valueOf(clientRef);
                         User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé: " + userId));
 
                         // customer + subscription sont en général présentes sur une session checkout complétée
-                        String customerId = session.getCustomer() != null ? session.getCustomer().toString() : null;
-                        String subscriptionId = session.getSubscription() != null ? session.getSubscription().toString() : null;
+                        customerId = session.getCustomer() != null ? session.getCustomer().toString() : null;
+                        subscriptionId = session.getSubscription() != null ? session.getSubscription().toString() : null;
 
                         if (customerId != null && !customerId.isBlank()) {
                             user.setStripeCustomerId(customerId);
@@ -357,22 +365,50 @@ public class BillingController {
                         }
 
                         userRepository.save(user);
+                        log.info(
+                                "Stripe webhook saved ids: userId={}, stripeCustomerId={}, stripeSubscriptionId={}",
+                                userId,
+                                customerId,
+                                subscriptionId
+                        );
                     } catch (Exception ignored) {
                         // Le webhook doit répondre "ok" même si l'enregistrement en base échoue.
                         // On évite de casser tout le flux Stripe.
+                        log.error(
+                                "Stripe webhook failed to save ids. eventType=checkout.session.completed clientRef={} userId={} customerId={} subscriptionId={}",
+                                clientRef,
+                                userId,
+                                customerId,
+                                subscriptionId,
+                                ignored
+                        );
                     }
                 }
             }
             case "customer.subscription.updated", "customer.subscription.created" -> {
                 Subscription sub = (Subscription) event.getDataObjectDeserializer()
                         .getObject().orElseThrow();
+                log.info("Stripe webhook received subscription event: id={}, status={}", sub.getId(), sub.getStatus());
                 // Optionnel: on peut enrichir la base ici si tu stockes plus de champs.
             }
             case "invoice.payment_succeeded", "invoice.payment_failed" -> {
                 // TODO: éventuellement créer / mettre à jour des factures en base.
+                Invoice inv = (Invoice) event.getDataObjectDeserializer()
+                        .getObject().orElse(null);
+                if (inv != null) {
+                    log.info(
+                            "Stripe webhook received invoice event: invoiceId={}, customer={}, status={}",
+                            inv.getId(),
+                            inv.getCustomer(),
+                            inv.getStatus()
+                    );
+                } else {
+                    log.info("Stripe webhook received invoice event: type={}", event.getType());
+                }
             }
             default -> {
                 // autres événements ignorés
+                log.debug("Stripe webhook ignored event type={}", event.getType());
             }
         }
 
