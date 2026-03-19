@@ -7,6 +7,7 @@ import com.stripe.model.Invoice;
 import com.stripe.model.Subscription;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
+import com.stripe.param.checkout.SessionRetrieveParams;
 import com.stripe.param.InvoiceListParams;
 import com.stripe.param.SubscriptionUpdateParams;
 import com.stripe.param.checkout.SessionCreateParams;
@@ -108,7 +109,7 @@ public class BillingService {
 
         SessionCreateParams.Builder builder = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
-                .setSuccessUrl(frontendUrl("/dashboard/subscription?success=1"))
+                .setSuccessUrl(frontendUrl("/dashboard/subscription?success=1&session_id={CHECKOUT_SESSION_ID}"))
                 .setCancelUrl(frontendUrl("/dashboard/subscription?canceled=1"))
                 .setClientReferenceId(String.valueOf(userId))
                 .addLineItem(
@@ -145,6 +146,15 @@ public class BillingService {
     public Event constructEventFromWebhook(String payload, String sigHeader) throws Exception {
         ensureStripeConfigured();
         return Webhook.constructEvent(payload, sigHeader, webhookSecret);
+    }
+
+    public Session retrieveCheckoutSession(String sessionId) throws StripeException {
+        ensureStripeConfigured();
+        SessionRetrieveParams params = SessionRetrieveParams.builder()
+                .addExpand("customer")
+                .addExpand("subscription")
+                .build();
+        return Session.retrieve(sessionId, params, null);
     }
 
     public String createBillingPortalSession(String customerId, String returnUrl, String locale) throws StripeException {

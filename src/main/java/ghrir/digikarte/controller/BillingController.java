@@ -158,6 +158,42 @@ public class BillingController {
         }
     }
 
+    /**
+     * Fallback après redirection success Stripe: persiste immédiatement les IDs Stripe
+     * (customer + subscription) pour l'utilisateur connecté, au cas où le webhook est en retard.
+     */
+    @PostMapping("/checkout/confirm")
+    public ResponseEntity<?> confirmCheckout(@RequestBody Map<String, String> body,
+                                             HttpServletRequest request) throws StripeException {
+        User user = getCurrentUser(request);
+        String sessionId = body.get("sessionId");
+        if (sessionId == null || sessionId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "sessionId manquant"));
+        }
+
+        Session session = billingService.retrieveCheckoutSession(sessionId);
+        String clientRef = session.getClientReferenceId();
+        if (clientRef == null || !clientRef.equals(String.valueOf(user.getId()))) {
+            return ResponseEntity.status(403).body(Map.of("message", "Session Stripe invalide pour cet utilisateur"));
+        }
+
+        String customerId = session.getCustomer() != null ? session.getCustomer().toString() : null;
+        String subscriptionId = session.getSubscription() != null ? session.getSubscription().toString() : null;
+
+        if (customerId != null && !customerId.isBlank()) {
+            user.setStripeCustomerId(customerId);
+        }
+        if (subscriptionId != null && !subscriptionId.isBlank()) {
+            user.setStripeSubscriptionId(subscriptionId);
+        }
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of(
+                "stripeCustomerId", user.getStripeCustomerId(),
+                "stripeSubscriptionId", user.getStripeSubscriptionId()
+        ));
+    }
+
     @PostMapping("/me/payment-portal")
     public ResponseEntity<Map<String, String>> openPaymentPortal(@RequestBody Map<String, String> body,
                                                                  HttpServletRequest request) throws StripeException {
