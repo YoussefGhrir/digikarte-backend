@@ -35,10 +35,12 @@ public class GoogleOAuthService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    public String buildGoogleAuthUrl(String lang) {
+    public String buildGoogleAuthUrl(String lang, String source) {
         String scope = "openid%20email%20profile";
         String encodedRedirect = java.net.URLEncoder.encode(redirectUri, StandardCharsets.UTF_8);
-        String state = (lang != null && !lang.isBlank()) ? lang : "de";
+        String safeLang = (lang != null && !lang.isBlank()) ? lang : "de";
+        String safeSource = (source != null && !source.isBlank()) ? source : "login";
+        String state = safeLang + ":" + safeSource;
         return "https://accounts.google.com/o/oauth2/v2/auth"
                 + "?client_id=" + clientId
                 + "&redirect_uri=" + encodedRedirect
@@ -49,7 +51,7 @@ public class GoogleOAuthService {
                 + "&include_granted_scopes=true";
     }
 
-    public AuthResponse handleCallback(String code) throws Exception {
+    public AuthResponse handleCallback(String code, boolean registerFlow) throws Exception {
         String tokenBody =
                 "code=" + encode(code)
                         + "&client_id=" + encode(clientId)
@@ -90,6 +92,11 @@ public class GoogleOAuthService {
         Optional<User> existingOpt = userRepository.findByEmail(email);
         User user;
         if (existingOpt.isPresent()) {
+            // Si on vient du flux "register" et que l'email existe déjà,
+            // on ne crée pas / ne connecte pas: on laisse le contrôleur gérer l'erreur.
+            if (registerFlow) {
+                throw new IllegalStateException("EMAIL_ALREADY_EXISTS:" + email);
+            }
             user = existingOpt.get();
             if (user.getPrenom() == null || user.getPrenom().isBlank()) user.setPrenom(givenName);
             if (user.getNom() == null || user.getNom().isBlank()) user.setNom(familyName);

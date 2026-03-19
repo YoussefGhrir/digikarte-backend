@@ -81,8 +81,11 @@ public class AuthController {
     }
 
     @GetMapping("/google/login")
-    public ResponseEntity<Void> googleLogin(@RequestParam(name = "lang", required = false) String lang) {
-        String url = googleOAuthService.buildGoogleAuthUrl(lang);
+    public ResponseEntity<Void> googleLogin(
+            @RequestParam(name = "lang", required = false) String lang,
+            @RequestParam(name = "source", required = false) String source
+    ) {
+        String url = googleOAuthService.buildGoogleAuthUrl(lang, source);
         return ResponseEntity.status(302)
                 .header("Location", url)
                 .build();
@@ -93,16 +96,45 @@ public class AuthController {
             @RequestParam("code") String code,
             @RequestParam(name = "state", required = false) String state
     ) throws Exception {
-        AuthResponse auth = googleOAuthService.handleCallback(code);
-        String lang = (state != null && !state.isBlank()) ? state : "de";
+        String lang = "de";
+        String source = "login";
+        if (state != null && !state.isBlank()) {
+            String[] parts = state.split(":", 2);
+            if (parts.length >= 1 && !parts[0].isBlank()) {
+                lang = parts[0];
+            }
+            if (parts.length == 2 && !parts[1].isBlank()) {
+                source = parts[1];
+            }
+        }
 
-        String redirect = "https://www.digi-karte.com/login"
-                + "?googleToken=" + java.net.URLEncoder.encode(auth.getToken(), java.nio.charset.StandardCharsets.UTF_8)
-                + "&lang=" + lang
-                + "&email=" + java.net.URLEncoder.encode(auth.getEmail(), java.nio.charset.StandardCharsets.UTF_8);
+        boolean registerFlow = "register".equalsIgnoreCase(source);
 
-        return ResponseEntity.status(302)
-                .header("Location", redirect)
-                .build();
+        try {
+            AuthResponse auth = googleOAuthService.handleCallback(code, registerFlow);
+
+            String redirect = "https://www.digi-karte.com/login"
+                    + "?googleToken=" + java.net.URLEncoder.encode(auth.getToken(), java.nio.charset.StandardCharsets.UTF_8)
+                    + "&lang=" + java.net.URLEncoder.encode(lang, java.nio.charset.StandardCharsets.UTF_8)
+                    + "&email=" + java.net.URLEncoder.encode(auth.getEmail(), java.nio.charset.StandardCharsets.UTF_8);
+
+            return ResponseEntity.status(302)
+                    .header("Location", redirect)
+                    .build();
+        } catch (IllegalStateException ex) {
+            String msg = ex.getMessage();
+            if (registerFlow && msg != null && msg.startsWith("EMAIL_ALREADY_EXISTS:")) {
+                String email = msg.substring("EMAIL_ALREADY_EXISTS:".length());
+                String redirect = "https://www.digi-karte.com/register"
+                        + "?googleError=EMAIL_ALREADY_EXISTS"
+                        + "&lang=" + java.net.URLEncoder.encode(lang, java.nio.charset.StandardCharsets.UTF_8)
+                        + "&email=" + java.net.URLEncoder.encode(email, java.nio.charset.StandardCharsets.UTF_8);
+
+                return ResponseEntity.status(302)
+                        .header("Location", redirect)
+                        .build();
+            }
+            throw ex;
+        }
     }
 }
