@@ -91,6 +91,15 @@ public class AuthController {
                 .build();
     }
 
+    @GetMapping("/google/login-url")
+    public ResponseEntity<Map<String, String>> googleLoginUrl(
+            @RequestParam(name = "lang", required = false) String lang,
+            @RequestParam(name = "source", required = false) String source
+    ) {
+        String url = googleOAuthService.buildGoogleAuthUrl(lang, source);
+        return ResponseEntity.ok(Map.of("url", url));
+    }
+
     @GetMapping("/google/callback")
     public ResponseEntity<Void> googleCallback(
             @RequestParam("code") String code,
