@@ -134,7 +134,18 @@ public class AuthController {
                         .header("Location", redirect)
                         .build();
             }
-            throw ex;
+
+            String baseRedirect = registerFlow
+                    ? "https://www.digi-karte.com/register"
+                    : "https://www.digi-karte.com/login";
+
+            String redirect = baseRedirect
+                    + "?googleError=OAUTH_FAILED"
+                    + "&lang=" + java.net.URLEncoder.encode(lang, java.nio.charset.StandardCharsets.UTF_8);
+
+            return ResponseEntity.status(302)
+                    .header("Location", redirect)
+                    .build();
         }
     }
 }
