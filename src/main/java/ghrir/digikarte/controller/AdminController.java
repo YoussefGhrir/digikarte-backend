@@ -12,6 +12,7 @@ import ghrir.digikarte.service.AdminBootstrapService;
 import ghrir.digikarte.service.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.cache.CacheManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -446,13 +447,13 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}")
-    public void deleteUser(
+    public ResponseEntity<Void> deleteUser(
             @PathVariable Long id,
             Authentication authentication
     ) {
         requireAdmin(authentication);
 
-        if (Objects.equals(id, null)) return;
+        if (Objects.equals(id, null)) return ResponseEntity.badRequest().build();
 
         // Best-effort : évicter le cache des menus publics concernés.
         // (MenuPublicService met en cache les réponses sous "publicMenus".)
@@ -472,6 +473,7 @@ public class AdminController {
         }
 
         userRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }
 
