@@ -160,30 +160,49 @@ public class BillingController {
             return ResponseEntity.noContent().build();
         }
 
-        Subscription s = billingService.retrieveSubscription(stripeSubId);
+        try {
+            Subscription s = billingService.retrieveSubscription(stripeSubId);
 
-        String status = normalizeStatus(s.getStatus());
-        boolean autoRenew = !Boolean.TRUE.equals(s.getCancelAtPeriodEnd());
+            String status = normalizeStatus(s.getStatus());
+            boolean autoRenew = !Boolean.TRUE.equals(s.getCancelAtPeriodEnd());
 
-        String priceId = s.getItems().getData().get(0).getPrice().getId();
-        String planName = billingService.resolvePlanFromPrice(priceId);
+            String priceId = s.getItems().getData().get(0).getPrice().getId();
+            String planName = billingService.resolvePlanFromPrice(priceId);
 
-        long amount = s.getItems().getData().get(0).getPrice().getUnitAmount();
-        String currency = s.getItems().getData().get(0).getPrice().getCurrency().toUpperCase();
+            long amount = s.getItems().getData().get(0).getPrice().getUnitAmount();
+            String currency = s.getItems().getData().get(0).getPrice().getCurrency().toUpperCase();
 
-        SubscriptionDto dto = SubscriptionDto.builder()
-                .plan(planName)
-                .status(status)
-                .trialEnd(s.getTrialEnd() != null ? toIso(s.getTrialEnd()) : null)
-                .currentPeriodStart(s.getCurrentPeriodStart() != null ? toIso(s.getCurrentPeriodStart()) : null)
-                .currentPeriodEnd(s.getCurrentPeriodEnd() != null ? toIso(s.getCurrentPeriodEnd()) : null)
-                .nextPaymentAt(s.getCurrentPeriodEnd() != null ? toIso(s.getCurrentPeriodEnd()) : null)
-                .autoRenew(autoRenew)
-                .currency(currency)
-                .amount(amount / 100.0)
-                .build();
+            SubscriptionDto dto = SubscriptionDto.builder()
+                    .plan(planName)
+                    .status(status)
+                    .trialEnd(s.getTrialEnd() != null ? toIso(s.getTrialEnd()) : null)
+                    .currentPeriodStart(s.getCurrentPeriodStart() != null ? toIso(s.getCurrentPeriodStart()) : null)
+                    .currentPeriodEnd(s.getCurrentPeriodEnd() != null ? toIso(s.getCurrentPeriodEnd()) : null)
+                    .nextPaymentAt(s.getCurrentPeriodEnd() != null ? toIso(s.getCurrentPeriodEnd()) : null)
+                    .autoRenew(autoRenew)
+                    .currency(currency)
+                    .amount(amount / 100.0)
+                    .build();
 
-        return ResponseEntity.ok(dto);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalStateException e) {
+            // Stripe pas configuré côté backend => désactiver proprement la vue abonnement
+            log.error("Billing unavailable: {}", e.getMessage());
+            return ResponseEntity.status(503).build();
+        } catch (StripeException e) {
+            // Si la subscription Stripe n'existe plus (ou IDs incohérents), on nettoie en DB
+            String code = e.getCode();
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if ("resource_missing".equals(code) && msg.toLowerCase().contains("no such subscription")) {
+                user.setStripeSubscriptionId(null);
+                // le customer peut encore être valide, on le garde
+                userRepository.save(user);
+                return ResponseEntity.noContent().build();
+            }
+
+            log.error("Stripe error while retrieving subscription. code={}, msg={}", code, msg);
+            return ResponseEntity.status(502).build();
+        }
     }
 
     @PostMapping("/me/subscription/cancel")
@@ -303,7 +322,26 @@ public class BillingController {
             return ResponseEntity.noContent().build();
         }
 
-        List<Invoice> invoices = billingService.listInvoicesForCustomer(customerId);
+        List<Invoice> invoices;
+        try {
+            invoices = billingService.listInvoicesForCustomer(customerId);
+        } catch (IllegalStateException e) {
+            log.error("Billing unavailable: {}", e.getMessage());
+            return ResponseEntity.status(503).build();
+        } catch (StripeException e) {
+            String code = e.getCode();
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if ("resource_missing".equals(code) && msg.toLowerCase().contains("no such customer")) {
+                // IDs client incohérents => on nettoie et on évite 500
+                user.setStripeCustomerId(null);
+                user.setStripeSubscriptionId(null);
+                userRepository.save(user);
+                return ResponseEntity.noContent().build();
+            }
+
+            log.error("Stripe error while retrieving invoices. code={}, msg={}", code, msg);
+            return ResponseEntity.status(502).build();
+        }
 
         List<InvoiceDto> dtoList = invoices.stream().map(inv -> {
             Long createdEpoch = inv.getCreated();
