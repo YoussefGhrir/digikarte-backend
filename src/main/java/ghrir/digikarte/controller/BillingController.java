@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api/billing")
@@ -34,6 +35,23 @@ public class BillingController {
     private final BillingService billingService;
     private final UserRepository userRepository;
     private final JwtService jwtService;
+
+    @Value("${frontend.url:http://localhost:3000}")
+    private String frontendBaseUrl;
+
+    private String frontendUrl(String pathAndQuery) {
+        String base = frontendBaseUrl == null ? "" : frontendBaseUrl.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (pathAndQuery == null || pathAndQuery.isBlank()) {
+            return base;
+        }
+        if (!pathAndQuery.startsWith("/")) {
+            return base + "/" + pathAndQuery;
+        }
+        return base + pathAndQuery;
+    }
 
     private User getCurrentUser(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -153,7 +171,7 @@ public class BillingController {
 
         String portalUrl = billingService.createBillingPortalSession(
                 customerId,
-                "http://localhost:3000/dashboard/subscription",
+                frontendUrl("/dashboard/subscription"),
                 locale
         );
 

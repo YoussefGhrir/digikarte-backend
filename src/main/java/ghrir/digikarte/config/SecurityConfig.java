@@ -34,6 +34,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        // Stripe webhooks ne peuvent pas envoyer un JWT
+                        .requestMatchers("/api/billing/webhook").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         // CORS preflight (OPTIONS) doit être autorisé sinon le browser n'obtient pas les headers CORS
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

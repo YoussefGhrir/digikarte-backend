@@ -38,6 +38,9 @@ public class BillingService {
     @Value("${stripe.webhook-secret}")
     private String webhookSecret;
 
+    @Value("${frontend.url:http://localhost:3000}")
+    private String frontendBaseUrl;
+
     @PostConstruct
     public void init() {
         // Stripe est optionnel pour démarrer l'appli (login, dashboard, etc.).
@@ -68,6 +71,20 @@ public class BillingService {
         Stripe.apiKey = stripeSecretKey;
     }
 
+    private String frontendUrl(String pathAndQuery) {
+        String base = frontendBaseUrl == null ? "" : frontendBaseUrl.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (pathAndQuery == null || pathAndQuery.isBlank()) {
+            return base;
+        }
+        if (!pathAndQuery.startsWith("/")) {
+            return base + "/" + pathAndQuery;
+        }
+        return base + pathAndQuery;
+    }
+
     public String createCheckoutSession(
             String plan,
             String customerEmail,
@@ -91,8 +108,8 @@ public class BillingService {
 
         SessionCreateParams.Builder builder = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
-                .setSuccessUrl("http://localhost:3000/dashboard/subscription?success=1")
-                .setCancelUrl("http://localhost:3000/dashboard/subscription?canceled=1")
+                .setSuccessUrl(frontendUrl("/dashboard/subscription?success=1"))
+                .setCancelUrl(frontendUrl("/dashboard/subscription?canceled=1"))
                 .setClientReferenceId(String.valueOf(userId))
                 .addLineItem(
                         SessionCreateParams.LineItem.builder()
