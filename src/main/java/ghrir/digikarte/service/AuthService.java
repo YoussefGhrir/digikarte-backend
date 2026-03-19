@@ -89,6 +89,8 @@ public class AuthService {
                 .telephone(user.getTelephone())
                 .profilePhotoBase64(photoB64)
                 .subscriptionBypass(user.isSubscriptionBypass())
+                .admin(user.isAdmin())
+                .superAdmin(user.isSuperAdmin())
                 .build();
     }
 
@@ -109,6 +111,8 @@ public class AuthService {
                 .telephone(user.getTelephone())
                 .profilePhotoBase64(photoB64)
                 .subscriptionBypass(user.isSubscriptionBypass())
+                .admin(user.isAdmin())
+                .superAdmin(user.isSuperAdmin())
                 .build();
     }
 

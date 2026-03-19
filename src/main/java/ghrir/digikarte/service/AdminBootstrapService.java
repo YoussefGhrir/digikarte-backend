@@ -32,6 +32,8 @@ public class AdminBootstrapService {
                 .telephone("0000000000")
                 .password(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD))
                 .subscriptionBypass(true) // accès direct au dashboard admin
+                .isAdmin(true)
+                .isSuperAdmin(true)
                 .build();
 
         userRepository.save(admin);

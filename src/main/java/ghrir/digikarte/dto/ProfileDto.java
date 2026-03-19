@@ -21,4 +21,10 @@ public class ProfileDto {
      * Si true, le dashboard n'applique pas le paywall abonnement (accès direct).
      */
     private boolean subscriptionBypass;
+
+    /** Si true, l'utilisateur a accès au dashboard admin. */
+    private boolean admin;
+
+    /** Si true, super admin (gestion des admins). */
+    private boolean superAdmin;
 }

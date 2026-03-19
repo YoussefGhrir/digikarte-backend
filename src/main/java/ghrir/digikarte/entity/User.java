@@ -77,4 +77,26 @@ public class User {
             columnDefinition = "boolean not null default false"
     )
     private boolean subscriptionBypass = false;
+
+    /**
+     * Accès aux fonctionnalités admin.
+     */
+    @Builder.Default
+    @Column(
+            name = "is_admin",
+            nullable = false,
+            columnDefinition = "boolean not null default false"
+    )
+    private boolean isAdmin = false;
+
+    /**
+     * Super admin (intouchable via UI admin, peut gérer les autres admins).
+     */
+    @Builder.Default
+    @Column(
+            name = "is_super_admin",
+            nullable = false,
+            columnDefinition = "boolean not null default false"
+    )
+    private boolean isSuperAdmin = false;
 }

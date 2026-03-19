@@ -8,7 +8,6 @@ import ghrir.digikarte.entity.User;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.repository.OrganizationRepository;
 import ghrir.digikarte.repository.UserRepository;
-import ghrir.digikarte.service.AdminBootstrapService;
 import ghrir.digikarte.service.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,14 +34,25 @@ public class AdminController {
     private final PasswordEncoder passwordEncoder;
     private final CacheManager cacheManager;
 
-    private void requireAdmin(Authentication authentication) {
+    private User requireAdmin(Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
         }
         String email = authentication.getName();
-        if (email == null || !email.equalsIgnoreCase(AdminBootstrapService.DEFAULT_ADMIN_EMAIL)) {
+        User actor = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated"));
+        if (!actor.isAdmin() && !actor.isSuperAdmin()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Forbidden");
         }
+        return actor;
+    }
+
+    private User requireSuperAdmin(Authentication authentication) {
+        User actor = requireAdmin(authentication);
+        if (!actor.isSuperAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Super admin only");
+        }
+        return actor;
     }
 
     private static String normalizeStatus(String stripeStatus) {
@@ -238,13 +248,13 @@ public class AdminController {
             @RequestParam(name = "q", required = false) String q,
             Authentication authentication
     ) {
-        requireAdmin(authentication);
+        requireSuperAdmin(authentication);
         try {
             List<User> users = userRepository.findAll();
             // On exclut le compte owner/admin du tableau.
             // (C'est l'utilisateur connecté qui doit rester "lui-même" dans la sidebar, pas dans la gestion users.)
             users = users.stream()
-                    .filter(u -> u.getEmail() == null || !u.getEmail().equalsIgnoreCase(AdminBootstrapService.DEFAULT_ADMIN_EMAIL))
+                    .filter(u -> !u.isSuperAdmin())
                     .toList();
 
             String query = q != null ? q.trim().toLowerCase() : null;
@@ -256,6 +266,28 @@ public class AdminController {
                                 (u.getTelephone() != null && u.getTelephone().toLowerCase().contains(query))
                         )
                         .toList();
+            }
+
+            List<Long> userIds = users.stream().map(User::getId).toList();
+            Map<Long, List<Organization>> orgsByOwner = new HashMap<>();
+            if (!userIds.isEmpty()) {
+                List<Organization> allOrgs = organizationRepository.findByOwnerIdIn(userIds);
+                for (Organization org : allOrgs) {
+                    Long ownerId = org.getOwner() != null ? org.getOwner().getId() : null;
+                    if (ownerId == null) continue;
+                    orgsByOwner.computeIfAbsent(ownerId, k -> new ArrayList<>()).add(org);
+                }
+            }
+
+            List<Long> orgIds = orgsByOwner.values().stream()
+                    .flatMap(Collection::stream)
+                    .map(Organization::getId)
+                    .toList();
+            Map<Long, Long> menusByOrgId = new HashMap<>();
+            if (!orgIds.isEmpty()) {
+                for (MenuRepository.OrgMenuCountView row : menuRepository.countByOrganizationIds(orgIds)) {
+                    menusByOrgId.put(row.getOrganizationId(), row.getCount());
+                }
             }
 
             List<AdminUserDto> out = new ArrayList<>();
@@ -271,9 +303,17 @@ public class AdminController {
                 int orgCount = 0;
                 long menusCount = 0L;
                 try {
-                    country = primaryCountryForUser(u);
-                    orgCount = organizationsCountForUser(u);
-                    menusCount = menusCountForUser(u);
+                    List<Organization> ownerOrgs = orgsByOwner.getOrDefault(u.getId(), Collections.emptyList());
+                    orgCount = ownerOrgs.size();
+                    country = ownerOrgs.stream()
+                            .map(Organization::getCountry)
+                            .filter(Objects::nonNull)
+                            .filter(s -> !s.isBlank())
+                            .findFirst()
+                            .orElse(null);
+                    for (Organization org : ownerOrgs) {
+                        menusCount += menusByOrgId.getOrDefault(org.getId(), 0L);
+                    }
                 } catch (Exception ignored) {
                     // Best-effort: on affiche au moins l'utilisateur même si certaines stats échouent.
                 }
@@ -292,7 +332,9 @@ public class AdminController {
                         sub.status(),
                         sub.plan(),
                         u.isSubscriptionBypass(),
-                        photo
+                        photo,
+                        u.isAdmin(),
+                        u.isSuperAdmin()
                 ));
             }
             return out;
@@ -307,7 +349,7 @@ public class AdminController {
             @RequestBody AdminCreateUserRequest request,
             Authentication authentication
     ) {
-        requireAdmin(authentication);
+        requireSuperAdmin(authentication);
 
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email required");
@@ -330,6 +372,7 @@ public class AdminController {
         }
 
         boolean bypass = request.getSubscriptionBypass() == null || request.getSubscriptionBypass();
+        boolean admin = request.getAdmin() != null && request.getAdmin();
 
         User created = User.builder()
                 .nom(request.getNom().trim())
@@ -338,6 +381,8 @@ public class AdminController {
                 .telephone(request.getTelephone().trim())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .subscriptionBypass(bypass)
+                .isAdmin(admin)
+                .isSuperAdmin(false)
                 .build();
 
         created = userRepository.save(created);
@@ -353,7 +398,9 @@ public class AdminController {
                 "NO_SUBSCRIPTION",
                 null,
                 created.isSubscriptionBypass(),
-                profilePhotoBase64(created)
+                profilePhotoBase64(created),
+                created.isAdmin(),
+                created.isSuperAdmin()
         );
     }
 
@@ -363,15 +410,20 @@ public class AdminController {
             @RequestBody AdminUpdateUserRequest request,
             Authentication authentication
     ) {
-        requireAdmin(authentication);
+        requireSuperAdmin(authentication);
         try {
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+            if (user.isSuperAdmin()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Super admin account cannot be edited");
+            }
 
             if (request.getNom() != null && !request.getNom().isBlank()) user.setNom(request.getNom().trim());
             if (request.getPrenom() != null && !request.getPrenom().isBlank()) user.setPrenom(request.getPrenom().trim());
             if (request.getTelephone() != null && !request.getTelephone().isBlank()) user.setTelephone(request.getTelephone().trim());
             if (request.getSubscriptionBypass() != null) user.setSubscriptionBypass(request.getSubscriptionBypass());
+            if (request.getAdmin() != null) user.setAdmin(request.getAdmin());
 
             userRepository.save(user);
 
@@ -407,7 +459,9 @@ public class AdminController {
                     sub.status(),
                     sub.plan(),
                     user.isSubscriptionBypass(),
-                    profilePhotoBase64(user)
+                    profilePhotoBase64(user),
+                    user.isAdmin(),
+                    user.isSuperAdmin()
             );
         } catch (Exception e) {
             // Ne jamais remonter un 500 brut côté admin : on renvoie un DTO minimal.
@@ -427,7 +481,9 @@ public class AdminController {
                     "ERROR",
                     null,
                     user.isSubscriptionBypass(),
-                    profilePhotoBase64(user)
+                    profilePhotoBase64(user),
+                    user.isAdmin(),
+                    user.isSuperAdmin()
             );
         }
     }
@@ -438,7 +494,7 @@ public class AdminController {
             @RequestBody AdminResetPasswordRequest request,
             Authentication authentication
     ) {
-        requireAdmin(authentication);
+        requireSuperAdmin(authentication);
 
         if (request.getPassword() == null || request.getPassword().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password required");
@@ -446,6 +502,9 @@ public class AdminController {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (user.isSuperAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Super admin account cannot be modified");
+        }
 
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);
@@ -456,9 +515,14 @@ public class AdminController {
             @PathVariable Long id,
             Authentication authentication
     ) {
-        requireAdmin(authentication);
+        requireSuperAdmin(authentication);
 
         if (Objects.equals(id, null)) return ResponseEntity.badRequest().build();
+        User target = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (target.isSuperAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Super admin account cannot be deleted");
+        }
 
         // Best-effort : évicter le cache des menus publics concernés.
         // (MenuPublicService met en cache les réponses sous "publicMenus".)

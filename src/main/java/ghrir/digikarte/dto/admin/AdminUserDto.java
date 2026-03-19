@@ -37,5 +37,11 @@ public class AdminUserDto {
      * (Utilisé uniquement côté admin pour afficher un avatar.)
      */
     private String profilePhotoBase64;
+
+    /** L'utilisateur a accès à l'espace admin. */
+    private boolean admin;
+
+    /** Super admin (gestion des admins). */
+    private boolean superAdmin;
 }
 

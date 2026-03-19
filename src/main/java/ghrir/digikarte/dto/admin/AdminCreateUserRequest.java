@@ -15,5 +15,10 @@ public class AdminCreateUserRequest {
      * Par défaut : true (compte créé “manuellement”).
      */
     private Boolean subscriptionBypass;
+
+    /**
+     * Si true, l'utilisateur obtient l'accès admin (non super admin).
+     */
+    private Boolean admin;
 }
 

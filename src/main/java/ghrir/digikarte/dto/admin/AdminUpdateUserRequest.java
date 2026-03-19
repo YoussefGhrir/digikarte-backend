@@ -12,5 +12,10 @@ public class AdminUpdateUserRequest {
      * Si true => paywall désactivé (accès direct).
      */
     private Boolean subscriptionBypass;
+
+    /**
+     * Si true, l'utilisateur a accès admin (hors super admin).
+     */
+    private Boolean admin;
 }
 

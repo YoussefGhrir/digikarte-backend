@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface OrganizationRepository extends JpaRepository<Organization, Long> {
     List<Organization> findByOwnerId(Long ownerId);
+    List<Organization> findByOwnerIdIn(List<Long> ownerIds);
 }
