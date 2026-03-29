@@ -78,6 +78,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
+        // Sous certains chemins d’erreur (ex. ressources statiques), ces types arrivent encore ici.
+        if (ex instanceof ResponseStatusException rse) {
+            return handleResponseStatus(rse);
+        }
+        if (ex instanceof NoResourceFoundException nrfe) {
+            return handleNoResourceFound(nrfe);
+        }
         log.warn("Unexpected server error: {} - {}", ex.getClass().getSimpleName(), ex.getMessage(), ex);
         ErrorResponse error = new ErrorResponse("INTERNAL_ERROR", "Unexpected server error");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);

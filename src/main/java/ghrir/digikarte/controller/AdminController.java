@@ -8,8 +8,11 @@ import ghrir.digikarte.entity.User;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.repository.OrganizationRepository;
 import ghrir.digikarte.repository.UserRepository;
+import ghrir.digikarte.service.AdminUserOrganizationsService;
 import ghrir.digikarte.service.BillingService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.cache.CacheManager;
@@ -27,9 +30,12 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AdminController {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
+
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final MenuRepository menuRepository;
+    private final AdminUserOrganizationsService adminUserOrganizationsService;
     private final BillingService billingService;
     private final PasswordEncoder passwordEncoder;
     private final CacheManager cacheManager;
@@ -129,117 +135,115 @@ public class AdminController {
     }
 
     @GetMapping("/metrics")
+    @Transactional(readOnly = true)
     public AdminMetricsDto metrics(
             @RequestParam(name = "days", required = false, defaultValue = "30") int days,
             Authentication authentication
     ) {
         requireAdmin(authentication);
         if (days < 1) days = 30;
-        try {
-            List<User> users = userRepository.findAll();
-            int totalUsers = users.size();
 
-            Map<Long, String> statusByUserId = new HashMap<>();
-            for (User u : users) {
-                SubscriptionInfo info = getSubscriptionInfo(u);
-                statusByUserId.put(u.getId(), info.status());
-            }
+        List<User> users = userRepository.findAll();
+        int totalUsers = users.size();
 
-            int activeSubs = 0;
-            int trialingSubs = 0;
-            int expiredSubs = 0;
-            int cancelledSubs = 0;
-
-            for (String status : statusByUserId.values()) {
-                switch (status) {
-                    case "ACTIVE" -> activeSubs++;
-                    case "TRIALING" -> trialingSubs++;
-                    case "EXPIRED" -> expiredSubs++;
-                    case "CANCELLED" -> cancelledSubs++;
-                }
-            }
-
-            double subscriptionActiveRate = totalUsers > 0 ? (activeSubs + trialingSubs) * 1.0 / totalUsers : 0.0;
-
-            // Revenue (approx.) : somme des 10 dernières invoices payées par client Stripe
-            long cutoffEpochSeconds = Instant.now().getEpochSecond() - (days * 86400L);
-            double revenuePaid = 0.0;
-            String revenueCurrency = null;
-            for (User u : users) {
-                String customerId = u.getStripeCustomerId();
-                if (customerId == null || customerId.isBlank()) continue;
-                try {
-                    List<Invoice> invoices = billingService.listInvoicesForCustomer(customerId, 10L);
-                    for (Invoice inv : invoices) {
-                        if (inv.getCreated() == null || inv.getStatus() == null) continue;
-                        long created = inv.getCreated();
-                        if (created < cutoffEpochSeconds) continue;
-                        String invStatus = inv.getStatus().toString().toUpperCase();
-                        if (!"PAID".equals(invStatus)) continue;
-                        long rawAmount = inv.getAmountPaid() != null ? inv.getAmountPaid() : 0L;
-                        revenuePaid += rawAmount / 100.0;
-                        if (revenueCurrency == null && inv.getCurrency() != null) {
-                            revenueCurrency = inv.getCurrency().toUpperCase();
-                        }
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-
-            // Stats par pays (country d'organization)
-            Map<String, Set<Long>> userIdsByCountry = new HashMap<>();
-            Map<String, Long> menusCountByCountry = new HashMap<>();
-            for (User u : users) {
-                List<Organization> orgs = organizationRepository.findByOwnerId(u.getId());
-                if (orgs == null || orgs.isEmpty()) {
-                    userIdsByCountry.computeIfAbsent("UNKNOWN", k -> new HashSet<>()).add(u.getId());
-                    continue;
-                }
-                for (Organization org : orgs) {
-                    String country = org.getCountry();
-                    if (country == null || country.isBlank()) country = "UNKNOWN";
-                    userIdsByCountry.computeIfAbsent(country, k -> new HashSet<>()).add(u.getId());
-                    menusCountByCountry.merge(country, menuRepository.countByOrganizationId(org.getId()), Long::sum);
-                }
-            }
-
-            List<CountryMetricsDto> byCountry = new ArrayList<>();
-            for (Map.Entry<String, Set<Long>> entry : userIdsByCountry.entrySet()) {
-                String country = entry.getKey();
-                Set<Long> userIds = entry.getValue();
-
-                int usersCount = userIds.size();
-                int cActive = 0;
-                int cTrialing = 0;
-                int cExpired = 0;
-                int cCancelled = 0;
-                for (Long uid : userIds) {
-                    String st = statusByUserId.get(uid);
-                    if ("ACTIVE".equals(st)) cActive++;
-                    else if ("TRIALING".equals(st)) cTrialing++;
-                    else if ("EXPIRED".equals(st)) cExpired++;
-                    else if ("CANCELLED".equals(st)) cCancelled++;
-                }
-
-                double rate = usersCount > 0 ? (cActive + cTrialing) * 1.0 / usersCount : 0.0;
-                long menusCount = menusCountByCountry.getOrDefault(country, 0L);
-                byCountry.add(new CountryMetricsDto(country, usersCount, menusCount, cActive, cTrialing, cExpired, cCancelled, rate, null));
-            }
-
-            // Tri : par taux d'abonnement puis par nombre de menus
-            byCountry.sort((a, b) -> {
-                int cmp = Double.compare(b.getSubscriptionRate(), a.getSubscriptionRate());
-                if (cmp != 0) return cmp;
-                return Long.compare(b.getMenusCount(), a.getMenusCount());
-            });
-
-            if (revenueCurrency == null) revenueCurrency = "EUR";
-
-            return new AdminMetricsDto(totalUsers, activeSubs, trialingSubs, expiredSubs, cancelledSubs, subscriptionActiveRate, revenuePaid, revenueCurrency, byCountry);
-        } catch (Exception ignored) {
-            // Ne jamais casser l'écran admin.
-            return new AdminMetricsDto(0, 0, 0, 0, 0, 0.0, 0.0, "EUR", new ArrayList<>());
+        Map<Long, String> statusByUserId = new HashMap<>();
+        for (User u : users) {
+            SubscriptionInfo info = getSubscriptionInfo(u);
+            statusByUserId.put(u.getId(), info.status());
         }
+
+        int activeSubs = 0;
+        int trialingSubs = 0;
+        int expiredSubs = 0;
+        int cancelledSubs = 0;
+
+        for (String status : statusByUserId.values()) {
+            switch (status) {
+                case "ACTIVE" -> activeSubs++;
+                case "TRIALING" -> trialingSubs++;
+                case "EXPIRED" -> expiredSubs++;
+                case "CANCELLED" -> cancelledSubs++;
+            }
+        }
+
+        double subscriptionActiveRate = totalUsers > 0 ? (activeSubs + trialingSubs) * 1.0 / totalUsers : 0.0;
+
+        // Revenue (approx.) : somme des 10 dernières invoices payées par client Stripe
+        long cutoffEpochSeconds = Instant.now().getEpochSecond() - (days * 86400L);
+        double revenuePaid = 0.0;
+        String revenueCurrency = null;
+        for (User u : users) {
+            String customerId = u.getStripeCustomerId();
+            if (customerId == null || customerId.isBlank()) continue;
+            try {
+                List<Invoice> invoices = billingService.listInvoicesForCustomer(customerId, 10L);
+                for (Invoice inv : invoices) {
+                    if (inv.getCreated() == null || inv.getStatus() == null) continue;
+                    long created = inv.getCreated();
+                    if (created < cutoffEpochSeconds) continue;
+                    String invStatus = inv.getStatus().toString().toUpperCase();
+                    if (!"PAID".equals(invStatus)) continue;
+                    long rawAmount = inv.getAmountPaid() != null ? inv.getAmountPaid() : 0L;
+                    revenuePaid += rawAmount / 100.0;
+                    if (revenueCurrency == null && inv.getCurrency() != null) {
+                        revenueCurrency = inv.getCurrency().toUpperCase();
+                    }
+                }
+            } catch (Exception ex) {
+                log.debug("Skip revenue invoices for customer {}: {}", customerId, ex.getMessage());
+            }
+        }
+
+        // Stats par pays (country d'organization)
+        Map<String, Set<Long>> userIdsByCountry = new HashMap<>();
+        Map<String, Long> menusCountByCountry = new HashMap<>();
+        for (User u : users) {
+            List<Organization> orgs = organizationRepository.findByOwnerId(u.getId());
+            if (orgs == null || orgs.isEmpty()) {
+                userIdsByCountry.computeIfAbsent("UNKNOWN", k -> new HashSet<>()).add(u.getId());
+                continue;
+            }
+            for (Organization org : orgs) {
+                String country = org.getCountry();
+                if (country == null || country.isBlank()) country = "UNKNOWN";
+                userIdsByCountry.computeIfAbsent(country, k -> new HashSet<>()).add(u.getId());
+                menusCountByCountry.merge(country, menuRepository.countByOrganizationId(org.getId()), Long::sum);
+            }
+        }
+
+        List<CountryMetricsDto> byCountry = new ArrayList<>();
+        for (Map.Entry<String, Set<Long>> entry : userIdsByCountry.entrySet()) {
+            String country = entry.getKey();
+            Set<Long> userIds = entry.getValue();
+
+            int usersCount = userIds.size();
+            int cActive = 0;
+            int cTrialing = 0;
+            int cExpired = 0;
+            int cCancelled = 0;
+            for (Long uid : userIds) {
+                String st = statusByUserId.get(uid);
+                if ("ACTIVE".equals(st)) cActive++;
+                else if ("TRIALING".equals(st)) cTrialing++;
+                else if ("EXPIRED".equals(st)) cExpired++;
+                else if ("CANCELLED".equals(st)) cCancelled++;
+            }
+
+            double rate = usersCount > 0 ? (cActive + cTrialing) * 1.0 / usersCount : 0.0;
+            long menusCount = menusCountByCountry.getOrDefault(country, 0L);
+            byCountry.add(new CountryMetricsDto(country, usersCount, menusCount, cActive, cTrialing, cExpired, cCancelled, rate, null));
+        }
+
+        // Tri : par taux d'abonnement puis par nombre de menus
+        byCountry.sort((a, b) -> {
+            int cmp = Double.compare(b.getSubscriptionRate(), a.getSubscriptionRate());
+            if (cmp != 0) return cmp;
+            return Long.compare(b.getMenusCount(), a.getMenusCount());
+        });
+
+        if (revenueCurrency == null) revenueCurrency = "EUR";
+
+        return new AdminMetricsDto(totalUsers, activeSubs, trialingSubs, expiredSubs, cancelledSubs, subscriptionActiveRate, revenuePaid, revenueCurrency, byCountry);
     }
 
     @GetMapping("/users")
@@ -342,6 +346,17 @@ public class AdminController {
             // On ne veut jamais casser l'écran admin.
             return new ArrayList<>();
         }
+    }
+
+    @GetMapping("/users/{userId}/organizations")
+    public List<AdminUserOrganizationDto> listOrganizationsForUser(
+            @PathVariable Long userId,
+            Authentication authentication
+    ) {
+        requireAdmin(authentication);
+        User target = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        return adminUserOrganizationsService.listOrganizationsAndMenusForOwner(target.getId());
     }
 
     @PostMapping("/users")

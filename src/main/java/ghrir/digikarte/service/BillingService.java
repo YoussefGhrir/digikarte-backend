@@ -80,6 +80,17 @@ public class BillingService {
         Stripe.apiKey = stripeSecretKey;
     }
 
+    /**
+     * Lecture API Stripe (abonnement, factures) : la clé secrète suffit.
+     * Les métriques admin et listes de factures ne doivent pas échouer si seuls webhook / price ids manquent.
+     */
+    private void ensureStripeSecretKeyForReads() {
+        if (stripeSecretKey == null || stripeSecretKey.isBlank()) {
+            throw new IllegalStateException("Stripe is not configured (missing STRIPE_SECRET_KEY).");
+        }
+        Stripe.apiKey = stripeSecretKey;
+    }
+
     private String frontendUrl(String pathAndQuery) {
         String base = frontendBaseUrl == null ? "" : frontendBaseUrl.trim();
         if (base.endsWith("/")) {
@@ -191,7 +202,7 @@ public class BillingService {
     }
 
     public Subscription retrieveSubscriptionCached(String subscriptionId) throws StripeException {
-        ensureStripeConfigured();
+        ensureStripeSecretKeyForReads();
         long now = System.currentTimeMillis();
         CachedSubscription cached = subscriptionCache.get(subscriptionId);
         if (cached != null && cached.expiresAt() > now) {
@@ -212,7 +223,7 @@ public class BillingService {
     }
 
     public List<Invoice> listInvoicesForCustomer(String customerId, long limit) throws StripeException {
-        ensureStripeConfigured();
+        ensureStripeSecretKeyForReads();
         InvoiceListParams params = InvoiceListParams.builder()
                 .setCustomer(customerId)
                 .setLimit(limit)
