@@ -348,7 +348,10 @@ public class AdminController {
         }
     }
 
-    @GetMapping("/users/{userId}/organizations")
+    /**
+     * Deux chemins : le front utilise {@code /user-organizations/{id}} (évite le conflit routing /users/… sur Boot 4).
+     */
+    @GetMapping({"/user-organizations/{userId}", "/users/{userId}/organizations"})
     public List<AdminUserOrganizationDto> listOrganizationsForUser(
             @PathVariable Long userId,
             Authentication authentication

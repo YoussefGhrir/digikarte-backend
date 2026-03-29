@@ -78,12 +78,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
-        // Sous certains chemins d’erreur (ex. ressources statiques), ces types arrivent encore ici.
         if (ex instanceof ResponseStatusException rse) {
             return handleResponseStatus(rse);
         }
         if (ex instanceof NoResourceFoundException nrfe) {
             return handleNoResourceFound(nrfe);
+        }
+        // Même simple name si chargeur de classes différent (rare) — évite un 500 sur « fichier statique » manquant.
+        if ("NoResourceFoundException".equals(ex.getClass().getSimpleName())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("NOT_FOUND", "No handler for this path"));
         }
         log.warn("Unexpected server error: {} - {}", ex.getClass().getSimpleName(), ex.getMessage(), ex);
         ErrorResponse error = new ErrorResponse("INTERNAL_ERROR", "Unexpected server error");
