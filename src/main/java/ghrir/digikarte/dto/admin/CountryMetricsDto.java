@@ -1,5 +1,6 @@
 package ghrir.digikarte.dto.admin;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,6 +26,7 @@ public class CountryMetricsDto {
     private double subscriptionRate;
 
     // utile pour afficher “revenu par pays” si on l'implémente ensuite
+    @JsonIgnore
     private List<String> _future;
 }
 

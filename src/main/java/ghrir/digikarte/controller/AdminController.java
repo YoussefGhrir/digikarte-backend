@@ -243,6 +243,16 @@ public class AdminController {
 
         if (revenueCurrency == null) revenueCurrency = "EUR";
 
+        log.info(
+                "Admin metrics: totalUsers={}, active={}, trialing={}, expired={}, cancelled={}, countries={}",
+                totalUsers,
+                activeSubs,
+                trialingSubs,
+                expiredSubs,
+                cancelledSubs,
+                byCountry.size()
+        );
+
         return new AdminMetricsDto(totalUsers, activeSubs, trialingSubs, expiredSubs, cancelledSubs, subscriptionActiveRate, revenuePaid, revenueCurrency, byCountry);
     }
 

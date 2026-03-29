@@ -7,17 +7,21 @@ import ghrir.digikarte.entity.User;
 import ghrir.digikarte.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class GoogleOAuthService {
 
     @Value("${GOOGLE_CLIENT_ID}")
@@ -31,6 +35,7 @@ public class GoogleOAuthService {
 
     private final UserRepository userRepository;
     private final AuthService authService;
+    private final ProfilePhotoService profilePhotoService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
@@ -88,6 +93,7 @@ public class GoogleOAuthService {
         String email = profile.get("email").asText();
         String givenName = profile.hasNonNull("given_name") ? profile.get("given_name").asText() : "";
         String familyName = profile.hasNonNull("family_name") ? profile.get("family_name").asText() : "";
+        String pictureUrl = profile.hasNonNull("picture") ? profile.get("picture").asText() : null;
 
         Optional<User> existingOpt = userRepository.findByEmail(email);
         User user;
@@ -109,9 +115,70 @@ public class GoogleOAuthService {
                     .password(java.util.UUID.randomUUID().toString())
                     .build();
         }
+
+        boolean isNewUser = existingOpt.isEmpty();
+        if (pictureUrl != null && !pictureUrl.isBlank()) {
+            boolean shouldApplyGooglePhoto = isNewUser
+                    || user.getProfilePhoto() == null
+                    || user.getProfilePhoto().length == 0;
+            if (shouldApplyGooglePhoto) {
+                fetchAndApplyGoogleProfilePhoto(user, pictureUrl);
+            }
+        }
+
         user = userRepository.save(user);
 
         return authService.generateAuthResponseForUser(user);
+    }
+
+    /**
+     * Télécharge l'avatar Google (userinfo "picture") et le stocke comme photo de profil DigiKarte.
+     * Ne remplace pas une photo déjà définie pour un compte existant (upload manuel).
+     */
+    private void fetchAndApplyGoogleProfilePhoto(User user, String pictureUrl) {
+        if (!isAllowedGoogleAvatarUrl(pictureUrl)) {
+            log.warn("Ignored Google profile picture URL with unexpected host/scheme");
+            return;
+        }
+        try {
+            HttpRequest picRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(pictureUrl))
+                    .timeout(Duration.ofSeconds(15))
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> picResponse =
+                    httpClient.send(picRequest, HttpResponse.BodyHandlers.ofByteArray());
+            if (picResponse.statusCode() != 200) {
+                log.warn("Google profile picture HTTP {}", picResponse.statusCode());
+                return;
+            }
+            byte[] body = picResponse.body();
+            if (body == null || body.length == 0 || body.length > ProfilePhotoService.getMaxInputBytes()) {
+                return;
+            }
+            String contentType = picResponse.headers().firstValue("Content-Type").orElse("image/jpeg");
+            byte[] processed = profilePhotoService.processProfilePhoto(new ByteArrayInputStream(body), contentType);
+            user.setProfilePhoto(processed);
+        } catch (Exception e) {
+            log.warn("Could not apply Google profile photo for user {}", user.getEmail(), e);
+        }
+    }
+
+    private static boolean isAllowedGoogleAvatarUrl(String url) {
+        try {
+            URI u = URI.create(url);
+            if (!"https".equalsIgnoreCase(u.getScheme())) {
+                return false;
+            }
+            String host = u.getHost();
+            if (host == null) {
+                return false;
+            }
+            String h = host.toLowerCase();
+            return h.endsWith("googleusercontent.com") || h.endsWith("ggpht.com");
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private static String encode(String v) {
