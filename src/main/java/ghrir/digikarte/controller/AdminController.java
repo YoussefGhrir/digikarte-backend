@@ -344,6 +344,32 @@ public class AdminController {
         }
     }
 
+    /**
+     * Organisations et menus d'un utilisateur client (super admin uniquement).
+     */
+    @GetMapping("/users/{userId}/organizations")
+    public List<AdminUserOrganizationDto> listOrganizationsForUser(
+            @PathVariable Long userId,
+            Authentication authentication
+    ) {
+        requireSuperAdmin(authentication);
+        User target = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        List<Organization> orgs = organizationRepository.findByOwnerId(target.getId());
+        if (orgs == null || orgs.isEmpty()) {
+            return List.of();
+        }
+        List<AdminUserOrganizationDto> out = new ArrayList<>();
+        for (Organization org : orgs) {
+            List<AdminUserOrganizationMenuDto> menus = new ArrayList<>();
+            for (MenuRepository.MenuSummaryView m : menuRepository.findByOrganizationIdOrderByIdAsc(org.getId())) {
+                menus.add(new AdminUserOrganizationMenuDto(m.getId(), m.getTitle(), m.getSlug()));
+            }
+            out.add(new AdminUserOrganizationDto(org.getId(), org.getName(), menus));
+        }
+        return out;
+    }
+
     @PostMapping("/users")
     public AdminUserDto createUser(
             @RequestBody AdminCreateUserRequest request,
