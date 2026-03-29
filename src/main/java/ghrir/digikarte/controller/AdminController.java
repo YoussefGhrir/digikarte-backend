@@ -8,7 +8,6 @@ import ghrir.digikarte.entity.User;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.repository.OrganizationRepository;
 import ghrir.digikarte.repository.UserRepository;
-import ghrir.digikarte.service.AdminUserOrganizationsService;
 import ghrir.digikarte.service.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,7 +30,6 @@ public class AdminController {
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final MenuRepository menuRepository;
-    private final AdminUserOrganizationsService adminUserOrganizationsService;
     private final BillingService billingService;
     private final PasswordEncoder passwordEncoder;
     private final CacheManager cacheManager;
@@ -344,20 +342,6 @@ public class AdminController {
             // On ne veut jamais casser l'écran admin.
             return new ArrayList<>();
         }
-    }
-
-    /**
-     * Organisations et menus d'un utilisateur client (admin ou super admin).
-     */
-    @GetMapping("/users/{userId}/organizations")
-    public List<AdminUserOrganizationDto> listOrganizationsForUser(
-            @PathVariable Long userId,
-            Authentication authentication
-    ) {
-        requireAdmin(authentication);
-        User target = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        return adminUserOrganizationsService.listOrganizationsAndMenusForOwner(target.getId());
     }
 
     @PostMapping("/users")
