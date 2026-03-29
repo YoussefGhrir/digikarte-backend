@@ -13,6 +13,7 @@ import ghrir.digikarte.service.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.cache.CacheManager;
@@ -136,7 +137,7 @@ public class AdminController {
 
     @GetMapping("/metrics")
     @Transactional(readOnly = true)
-    public AdminMetricsDto metrics(
+    public ResponseEntity<AdminMetricsDto> metrics(
             @RequestParam(name = "days", required = false, defaultValue = "30") int days,
             Authentication authentication
     ) {
@@ -253,7 +254,12 @@ public class AdminController {
                 byCountry.size()
         );
 
-        return new AdminMetricsDto(totalUsers, activeSubs, trialingSubs, expiredSubs, cancelledSubs, subscriptionActiveRate, revenuePaid, revenueCurrency, byCountry);
+        AdminMetricsDto body = new AdminMetricsDto(totalUsers, activeSubs, trialingSubs, expiredSubs, cancelledSubs, subscriptionActiveRate, revenuePaid, revenueCurrency, byCountry);
+        // Pas de cache CDN / proxy : une réponse vide ou périmée donnait un tableau de bord à 0 alors que /api/admin/users était correct.
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header("Vary", "Authorization")
+                .body(body);
     }
 
     @GetMapping("/users")
