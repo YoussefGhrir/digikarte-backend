@@ -2,8 +2,6 @@ package ghrir.digikarte.service;
 
 import ghrir.digikarte.dto.admin.AdminUserOrganizationDto;
 import ghrir.digikarte.dto.admin.AdminUserOrganizationMenuDto;
-import ghrir.digikarte.entity.Menu;
-import ghrir.digikarte.entity.Organization;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Lecture organisations / menus pour le panneau super-admin (transaction dédiée, pas de projection JPQL fragile).
+ * Lecture organisations / menus pour le panneau admin : projections légères (pas de LOB logo, pas de graphe MenuItem).
  */
 @Service
 @RequiredArgsConstructor
@@ -25,15 +23,16 @@ public class AdminUserOrganizationsService {
 
     @Transactional(readOnly = true)
     public List<AdminUserOrganizationDto> listOrganizationsAndMenusForOwner(Long ownerUserId) {
-        List<Organization> orgs = organizationRepository.findByOwnerId(ownerUserId);
+        List<OrganizationRepository.IdNameProjection> orgs =
+                organizationRepository.findIdAndNameByOwnerIdForAdmin(ownerUserId);
         if (orgs == null || orgs.isEmpty()) {
             return List.of();
         }
         List<AdminUserOrganizationDto> out = new ArrayList<>();
-        for (Organization org : orgs) {
+        for (OrganizationRepository.IdNameProjection org : orgs) {
             List<AdminUserOrganizationMenuDto> menus = new ArrayList<>();
-            for (Menu m : menuRepository.findMenusForAdminByOrganizationId(org.getId())) {
-                menus.add(new AdminUserOrganizationMenuDto(m.getId(), m.getTitle(), m.getSlug()));
+            for (MenuRepository.MenuSummaryView row : menuRepository.findByOrganizationIdOrderByIdAsc(org.getId())) {
+                menus.add(new AdminUserOrganizationMenuDto(row.getId(), row.getTitle(), row.getSlug()));
             }
             out.add(new AdminUserOrganizationDto(org.getId(), org.getName(), menus));
         }

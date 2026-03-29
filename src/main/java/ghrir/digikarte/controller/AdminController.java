@@ -347,14 +347,14 @@ public class AdminController {
     }
 
     /**
-     * Organisations et menus d'un utilisateur client (super admin uniquement).
+     * Organisations et menus d'un utilisateur client (admin ou super admin).
      */
     @GetMapping("/users/{userId}/organizations")
     public List<AdminUserOrganizationDto> listOrganizationsForUser(
             @PathVariable Long userId,
             Authentication authentication
     ) {
-        requireSuperAdmin(authentication);
+        requireAdmin(authentication);
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         return adminUserOrganizationsService.listOrganizationsAndMenusForOwner(target.getId());
