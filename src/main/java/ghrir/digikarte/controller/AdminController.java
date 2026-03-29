@@ -348,6 +348,7 @@ public class AdminController {
      * Organisations et menus d'un utilisateur client (super admin uniquement).
      */
     @GetMapping("/users/{userId}/organizations")
+    @Transactional(readOnly = true)
     public List<AdminUserOrganizationDto> listOrganizationsForUser(
             @PathVariable Long userId,
             Authentication authentication
@@ -362,7 +363,7 @@ public class AdminController {
         List<AdminUserOrganizationDto> out = new ArrayList<>();
         for (Organization org : orgs) {
             List<AdminUserOrganizationMenuDto> menus = new ArrayList<>();
-            for (MenuRepository.MenuSummaryView m : menuRepository.findByOrganizationIdOrderByIdAsc(org.getId())) {
+            for (MenuRepository.AdminUserMenuBrief m : menuRepository.findAdminBriefMenusByOrganizationId(org.getId())) {
                 menus.add(new AdminUserOrganizationMenuDto(m.getId(), m.getTitle(), m.getSlug()));
             }
             out.add(new AdminUserOrganizationDto(org.getId(), org.getName(), menus));
