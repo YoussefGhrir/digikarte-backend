@@ -33,19 +33,10 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     List<MenuSummaryView> findByOrganizationIdOrderByIdAsc(Long organizationId);
 
     /**
-     * Projection minimale pour l’admin (évite les écarts de schéma / bugs de projection sur toutes les colonnes).
+     * Menus d’une org pour l’admin (entités complètes : évite les bugs de projection JPQL en prod).
      */
-    interface AdminUserMenuBrief {
-        Long getId();
-        String getTitle();
-        String getSlug();
-    }
-
-    @Query(
-            "select m.id as id, m.title as title, m.slug as slug from Menu m "
-                    + "where m.organization.id = :organizationId order by m.id asc"
-    )
-    List<AdminUserMenuBrief> findAdminBriefMenusByOrganizationId(@Param("organizationId") Long organizationId);
+    @Query("select m from Menu m where m.organization.id = :organizationId order by m.id asc")
+    List<Menu> findMenusForAdminByOrganizationId(@Param("organizationId") Long organizationId);
 
     Optional<Menu> findBySlug(String slug);
 }

@@ -8,6 +8,7 @@ import ghrir.digikarte.entity.User;
 import ghrir.digikarte.repository.MenuRepository;
 import ghrir.digikarte.repository.OrganizationRepository;
 import ghrir.digikarte.repository.UserRepository;
+import ghrir.digikarte.service.AdminUserOrganizationsService;
 import ghrir.digikarte.service.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,7 @@ public class AdminController {
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final MenuRepository menuRepository;
+    private final AdminUserOrganizationsService adminUserOrganizationsService;
     private final BillingService billingService;
     private final PasswordEncoder passwordEncoder;
     private final CacheManager cacheManager;
@@ -348,7 +350,6 @@ public class AdminController {
      * Organisations et menus d'un utilisateur client (super admin uniquement).
      */
     @GetMapping("/users/{userId}/organizations")
-    @Transactional(readOnly = true)
     public List<AdminUserOrganizationDto> listOrganizationsForUser(
             @PathVariable Long userId,
             Authentication authentication
@@ -356,19 +357,7 @@ public class AdminController {
         requireSuperAdmin(authentication);
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        List<Organization> orgs = organizationRepository.findByOwnerId(target.getId());
-        if (orgs == null || orgs.isEmpty()) {
-            return List.of();
-        }
-        List<AdminUserOrganizationDto> out = new ArrayList<>();
-        for (Organization org : orgs) {
-            List<AdminUserOrganizationMenuDto> menus = new ArrayList<>();
-            for (MenuRepository.AdminUserMenuBrief m : menuRepository.findAdminBriefMenusByOrganizationId(org.getId())) {
-                menus.add(new AdminUserOrganizationMenuDto(m.getId(), m.getTitle(), m.getSlug()));
-            }
-            out.add(new AdminUserOrganizationDto(org.getId(), org.getName(), menus));
-        }
-        return out;
+        return adminUserOrganizationsService.listOrganizationsAndMenusForOwner(target.getId());
     }
 
     @PostMapping("/users")
