@@ -20,6 +20,9 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
     @Query("select o.id as id, o.name as name from Organization o where o.owner.id = :ownerId order by o.id asc")
     List<IdNameProjection> findIdAndNameByOwnerIdForAdmin(@Param("ownerId") Long ownerId);
 
-    List<Organization> findByOwnerId(Long ownerId);
-    List<Organization> findByOwnerIdIn(List<Long> ownerIds);
+    @Query("select o from Organization o where o.owner.id = :ownerId")
+    List<Organization> findByOwnerId(@Param("ownerId") Long ownerId);
+
+    @Query("select o from Organization o where o.owner.id in :ownerIds")
+    List<Organization> findByOwnerIdIn(@Param("ownerIds") List<Long> ownerIds);
 }
